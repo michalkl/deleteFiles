@@ -1,0 +1,249 @@
+object Form1: TForm1
+  Left = 0
+  Top = 0
+  Caption = 'Delete Files Application'
+  ClientHeight = 419
+  ClientWidth = 923
+  Color = clBtnFace
+  Font.Charset = DEFAULT_CHARSET
+  Font.Color = clWindowText
+  Font.Height = -11
+  Font.Name = 'Tahoma'
+  Font.Style = []
+  OldCreateOrder = False
+  OnResize = FormResize
+  DesignSize = (
+    923
+    419)
+  PixelsPerInch = 96
+  TextHeight = 13
+  object lbl1: TLabel
+    Left = 8
+    Top = 13
+    Width = 92
+    Height = 13
+    Caption = 'Selected Directory:'
+  end
+  object lbl2: TLabel
+    Left = 8
+    Top = 59
+    Width = 155
+    Height = 13
+    Caption = 'List of files in selected directory:'
+  end
+  object lbl5: TLabel
+    Left = 785
+    Top = 13
+    Width = 64
+    Height = 13
+    Anchors = [akTop, akRight]
+    Caption = 'Current time:'
+    ExplicitLeft = 719
+  end
+  object lbl3: TLabel
+    Left = 704
+    Top = 78
+    Width = 126
+    Height = 13
+    Anchors = [akTop, akRight]
+    Caption = 'Auto delete configuration:'
+    ExplicitLeft = 647
+  end
+  object btnSelect: TButton
+    Left = 704
+    Top = 30
+    Width = 75
+    Height = 25
+    Anchors = [akTop, akRight]
+    Caption = 'Select'
+    TabOrder = 0
+    OnClick = btnSelectClick
+    ExplicitLeft = 647
+  end
+  object edtChosenFilePath: TEdit
+    Left = 8
+    Top = 32
+    Width = 690
+    Height = 21
+    Anchors = [akLeft, akTop, akRight]
+    Enabled = False
+    TabOrder = 1
+    Text = 'No selection'
+    ExplicitWidth = 633
+  end
+  object edtCurrentTime: TEdit
+    Left = 785
+    Top = 32
+    Width = 122
+    Height = 21
+    Anchors = [akTop, akRight]
+    TabOrder = 2
+    ExplicitLeft = 728
+  end
+  object lvFileListView: TListView
+    Left = 8
+    Top = 78
+    Width = 690
+    Height = 323
+    Anchors = [akLeft, akTop, akRight, akBottom]
+    Columns = <>
+    TabOrder = 3
+    ExplicitWidth = 633
+  end
+  object edtAge: TEdit
+    Left = 767
+    Top = 97
+    Width = 74
+    Height = 21
+    Anchors = [akTop, akRight]
+    Enabled = False
+    TabOrder = 4
+    ExplicitLeft = 710
+  end
+  object edtSize: TEdit
+    Left = 767
+    Top = 124
+    Width = 74
+    Height = 21
+    Anchors = [akTop, akRight]
+    Enabled = False
+    TabOrder = 5
+    ExplicitLeft = 710
+  end
+  object btnAutoDelete: TButton
+    Left = 704
+    Top = 224
+    Width = 203
+    Height = 25
+    Anchors = [akTop, akRight]
+    Caption = 'Auto Delete'
+    Enabled = False
+    TabOrder = 6
+    OnClick = btnAutoDeleteClick
+    ExplicitLeft = 647
+  end
+  object chkMaxAge: TCheckBox
+    Left = 704
+    Top = 97
+    Width = 60
+    Height = 17
+    Anchors = [akTop, akRight]
+    Caption = 'Max age:'
+    Enabled = False
+    TabOrder = 7
+    OnClick = chkMaxAgeClick
+    ExplicitLeft = 647
+  end
+  object chkMaxSize: TCheckBox
+    Left = 704
+    Top = 124
+    Width = 60
+    Height = 17
+    Anchors = [akTop, akRight]
+    Caption = 'Max size:'
+    Enabled = False
+    TabOrder = 8
+    OnClick = chkMaxSizeClick
+    ExplicitLeft = 647
+  end
+  object chkDeleteEmptiedCatalogs: TCheckBox
+    Left = 704
+    Top = 151
+    Width = 146
+    Height = 17
+    Anchors = [akTop, akRight]
+    Caption = 'Delete emptied catalogs'
+    Enabled = False
+    TabOrder = 9
+    ExplicitLeft = 647
+  end
+  object chkDeleteAllEmpty: TCheckBox
+    Left = 704
+    Top = 174
+    Width = 146
+    Height = 17
+    Anchors = [akTop, akRight]
+    Caption = 'Delete all empty catalogs'
+    Enabled = False
+    TabOrder = 10
+    ExplicitLeft = 647
+  end
+  object cbbAge: TComboBox
+    Left = 847
+    Top = 97
+    Width = 60
+    Height = 21
+    Anchors = [akTop, akRight]
+    Enabled = False
+    TabOrder = 11
+    Items.Strings = (
+      'Days'
+      'Months'
+      'Years')
+    ExplicitLeft = 790
+  end
+  object cbbSize: TComboBox
+    Left = 847
+    Top = 124
+    Width = 60
+    Height = 21
+    Anchors = [akTop, akRight]
+    Enabled = False
+    TabOrder = 12
+    Items.Strings = (
+      'B'
+      'KB'
+      'MB'
+      'GB')
+    ExplicitLeft = 790
+  end
+  object edtRepeatTime: TEdit
+    Left = 796
+    Top = 197
+    Width = 45
+    Height = 21
+    Anchors = [akTop, akRight]
+    Enabled = False
+    TabOrder = 13
+    ExplicitLeft = 739
+  end
+  object cbbRepeatTime: TComboBox
+    Left = 847
+    Top = 197
+    Width = 60
+    Height = 21
+    Anchors = [akTop, akRight]
+    Enabled = False
+    TabOrder = 14
+    Items.Strings = (
+      'Seconds'
+      'Minutes'
+      'Hours'
+      'Days'
+      'Months'
+      'Years')
+    ExplicitLeft = 790
+  end
+  object chkRepead: TCheckBox
+    Left = 704
+    Top = 197
+    Width = 86
+    Height = 17
+    Anchors = [akTop, akRight]
+    Caption = 'Repeat every:'
+    Enabled = False
+    TabOrder = 15
+    OnClick = chkRepeadClick
+    ExplicitLeft = 647
+  end
+  object tmrAutoDelete: TTimer
+    Enabled = False
+    OnTimer = tmrAutoDeleteTimer
+    Left = 736
+    Top = 272
+  end
+  object tmrAutoRefresh: TTimer
+    Left = 832
+    Top = 272
+  end
+end

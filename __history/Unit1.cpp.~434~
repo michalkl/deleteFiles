@@ -1,0 +1,660 @@
+//---------------------------------------------------------------------------
+
+#include <vcl.h>
+#include <FileCtrl.hpp>
+#include <sys/stat.h>
+#include <time.h>
+#include <stdio.h>
+#include <windows.h>
+#include <direct.h>
+#pragma hdrstop
+
+#include "Unit1.h"
+//---------------------------------------------------------------------------
+#pragma package(smart_init)
+#pragma resource "*.dfm"
+TForm1 *Form1;
+//---------------------------------------------------------------------------
+__fastcall TForm1::TForm1(TComponent* Owner)
+	: TForm(Owner){
+	//rysuje listê
+	createListView();
+	//ustawia wartoœci domyœlne comboBoxów itp.
+	cbbAge->Text = "Days";
+	cbbSize->Text = "B";
+	cbbRepeatTime->Text = "Days";
+	edtRepeatTime->Text = "1";
+	tmrAutoDelete->Enabled = false;
+}
+//---------------------------------------------------------------------------
+void __fastcall TForm1::btnSelectClick(TObject *Sender){
+	//Œcie¿ka pocz¹tkowa
+//	String strDirectory = "C:\\AIC\\Projekty Builder\\deleteFolders\\doTestow";
+	String strDirectory = ExtractFilePath(Application->ExeName);
+	//umieszcza œcie¿kê wybran¹ przez u¿ytkowanika w strDirectory
+	int SelectionOK = SelectDirectory(strDirectory, TSelectDirOpts(), 0);
+
+	if (SelectionOK) {
+		//przypisanie i wyœwietlanie wybranej œcie¿ki w polu edtChosenFilePath
+		Form1->edtChosenFilePath->Text = strDirectory;
+		//jeœli podana œcie¿ka istnieje to wywo³aj funkcje listCatalogs
+		if (DirectoryExists(edtChosenFilePath->Text)){
+			//czyszczenie listView
+			lvFileListView->Items->Clear();
+			//wywo³anie funkcji która wype³nia ListView plikami z wybranego katalogu
+			listCatalogs(returnPath());
+		}
+		//wyœwietla aktualn¹ datê
+		getCurrentDate();
+
+		btnAutoDelete->Enabled = true;
+		chkMaxAge->Enabled = true;
+		chkMaxSize->Enabled = true;
+		chkDeleteEmptiedCatalogs->Enabled = true;
+		chkDeleteAllEmpty->Enabled = true;
+		chkRepead->Enabled = true;
+	}
+}
+//---------------------------------------------------------------------------
+/**
+ * returnPath - Funkcja zwraca wybran¹ przez u¿ytkownika scie¿kê
+ */
+String TForm1::returnPath(){
+	String selectedPath;
+
+	selectedPath = Form1->edtChosenFilePath->Text + "\\";
+	return selectedPath;
+}
+
+//---------------------------------------------------------------------------
+/**
+ * listCatalogs - Funkcja wype³niaj¹ca ListView plikami znajduj¹cymi siê w katalogu
+					wybranym przez u¿ytkownika
+ * @param String path - œcie¿ka do folderu podanego przez u¿ytkownika
+ */
+void TForm1::addElementToListView(const String &path, const TSearchRec &sr){
+    //potrzebne do wyœwietlania ListView
+	TListItem *ListIt =  NULL;
+
+	//filname sk³ada siê z aktualnej œcie¿ki oraz aktualnego pliku
+	AnsiString fileName = path + sr.Name;
+	//konwersja String na const char * dla funkcji getFilesize i getFileDate itp.
+	const char * fileNameChar = fileName.c_str();
+	//usuwa okreœlon¹ liczbê liter ze stringa (ca³¹ œcie¿kê, oprócz nazwy pliku)
+	fileName = fileName.Delete(1, edtChosenFilePath->Text.Length() + 1);
+
+	ListIt = lvFileListView->Items->Add();
+	//dodaje nazwê pliku do ListView
+	ListIt->Caption = fileName;
+	//wpisuje do ListView rozmiar danego pliku
+	ListIt->SubItems->Add(getFileSize(fileNameChar));
+	//wpisuje do ListView date danego pliku
+	ListIt->SubItems->Add(getFileDate(fileNameChar));
+	//zwraca ró¿nicê pomiêdzy aktualn¹ dat¹, a dat¹ pliku w postaci dni
+	double diff2Days = getDiffIntDate(fileNameChar);
+	diff2Days = ceil(diff2Days/86400);
+	ListIt->SubItems->Add(diff2Days);
+}
+//---------------------------------------------------------------------------
+/**
+ * listCatalogs - Funkcja wype³niaj¹ca ListView plikami znajduj¹cymi siê w katalogu
+ * wybranym przez u¿ytkownika
+ * @param String path - œcie¿ka do folderu podanego przez u¿ytkownika
+ */
+void TForm1::listCatalogs(const String &path){
+	TSearchRec sr;
+	TSearchRec sr2;
+	int result = 0, resultInCatalog = 0, result2 = 0;
+	String pathInCatalog;
+	bool flagCatalog = false;
+
+	//FindFirst searches the directory specified by path for the first file that
+	//matches the file name implied by path and the attributes specified by the
+	//Attr parameter. The result is returned in the sr parameter. FindFirst returns
+	//0 if a file was successfully located, otherwise, it returns an error code.
+	// faAnyFile - faDirectory - wybiera ka¿dy plik oprocz folderow
+
+	//Przeszukuje najpierw wszystkie pliki oprócz folderów i wypisuje
+	if (FindFirst(path + "*.*", faAnyFile, sr) == 0) {
+		while (result == 0){
+			if ((sr.Name != ".") && (sr.Name != "..")){
+				//funkcja wype³nia ListView
+				addElementToListView(path, sr);
+			}
+			result = FindNext(sr);
+		}
+	}
+	//Przeszukuje wszystkie pliki i wybiera foldery
+	if (FindFirst(path + "*.*", faDirectory, sr) == 0){
+			while (resultInCatalog == 0){
+				if ((sr.Name != ".") && (sr.Name != "..") && (sr.Attr & faDirectory)) {
+					//dodaje do œcie¿ki aktualny folder
+					pathInCatalog = path + sr.Name + "\\";
+					//wywo³uje ponownie przeszukiwanie dla danego folderu
+					listCatalogs(pathInCatalog);
+				}
+				resultInCatalog = FindNext(sr);
+			}
+	}
+	//zamyka przeszukiwanie folderu
+	FindClose(sr);
+
+	//wyœwietla listê
+	lvFileListView->ViewStyle = vsReport;
+}
+//---------------------------------------------------------------------------
+/**
+ * Pobiera rozmiar pliku
+ * @return - Zwraca rozmiar pliku lub -1 jeœli plik nie istnieje.
+ */
+size_t TForm1::getFileSize(const char* filename) {
+	struct stat st;
+	if(stat(filename, &st) != 0) {
+		return -1;
+	}
+	return st.st_size;
+}
+//---------------------------------------------------------------------------
+/**
+ * Pobiera datê pliku
+ * @return String - Zwraca datê pliku lub -1 jeœli plik nie istnieje.
+ */
+String TForm1::getFileDate(const char* filename) {
+	struct stat st;
+	if(stat(filename, &st) != 0) {
+		return -1;
+	}
+
+	//konwertuje zmienn¹ st_mtime na zrozumia³¹ datê
+	time_t t = st.st_mtime;
+	struct tm *info;
+	info = localtime(&t);
+	char buffer[80];
+
+	//wyœwietla czas w zadanej konfiguracji
+	strftime(buffer,sizeof(buffer),"%d.%m.%Y %H:%M:%S", info);
+	//konwertuje char buffer na string
+	String str(buffer);
+
+	return str;
+}
+//---------------------------------------------------------------------------
+/**
+ * //Wyœwietla aktualny czas
+ * @return String - Zwraca aktualn¹ datê.
+ */
+String TForm1::getCurrentDate(){
+	time_t currentTime;
+	struct tm *tmTime;
+	char buffer[80];
+
+	time(&currentTime);
+
+	tmTime = localtime(&currentTime);
+
+	strftime(buffer,80,"%d.%m.%Y %H:%M:%S", tmTime);
+	edtCurrentTime->Text = buffer;
+
+	String str(buffer);
+	return str;
+}
+//---------------------------------------------------------------------------
+/**
+ * Ró¿nica pomiêdzy dat¹ utwo¿enia pliku, a aktualnym czasem (ró¿nica jako double wyra¿ona w sekundach)
+ * @return String - Zwraca ró¿nicê pomiêdzy dat¹ pliku, a aktualnym czasem
+ */
+double TForm1::getDiffIntDate(const char* filename) {
+	struct stat st;
+	if(stat(filename, &st) != 0) {
+		return -1;
+	}
+
+	//aktualna data
+	time_t currentTime;
+	struct tm *tmTime;
+
+	time(&currentTime);
+	//ró¿nica pomiêdzy aktualn¹ dat¹, a dat¹ pliku w sekundach
+	double diff = currentTime - st.st_mtime;
+
+	//przelicza z sekund na dni i zaokr¹gla wartoœæ do góry
+	//diff = ceil(diff/86400);
+
+	return diff;
+}
+//---------------------------------------------------------------------------
+//Rysuje listView
+void TForm1::createListView() {
+	TListColumn *ListCol = NULL;
+
+	//Dodaje kolumnê do lvFileListView
+	ListCol = lvFileListView->Columns->Add();
+	ListCol->Caption = "File name";
+	ListCol->Width = 300;
+	ListCol->Alignment = taRightJustify;
+
+	ListCol = lvFileListView->Columns->Add();
+	ListCol->Caption = "Size (B)";
+	ListCol->Width = 70;
+	ListCol->Alignment = taRightJustify;
+
+	ListCol = lvFileListView->Columns->Add();
+	ListCol->Caption = "Modification date";
+	ListCol->Width = 140;
+	ListCol->Alignment = taRightJustify;
+
+	ListCol = lvFileListView->Columns->Add();
+	ListCol->Caption = "Age of a file (Days)";
+	ListCol->Width = 110;
+	ListCol->Alignment = taRightJustify;
+
+	ListCol = lvFileListView->Columns->Add();
+	ListCol->Caption = " ";
+	ListCol->Width = 5;
+}
+//---------------------------------------------------------------------------
+//funkcja na klikniêcie przycisku Confirm/Change
+void __fastcall TForm1::btnAutoDeleteClick(TObject *Sender){
+	//Sprawdzenie, czy podano liczbê czy inny znak w edtRepeatTime
+	if (getUserRepeatTime() == -1 && chkRepead->Checked) {
+		return;
+	}
+	else{
+        //ustawienie interwa³u timera do automatycznego usuwania
+		tmrAutoDelete->Interval = 1000 * getUserRepeatTime() * getRepeadTime();
+    }
+	//kliknieto AutoDelete - zabrania zmieniæ wartoœci w danych komórakch
+	if (buttonChangeFlag == false) {
+		//pobiera wartoœæ userAge podan¹ przez u¿ytkowanika jeœli wybrano tê opcjê
+		//oraz sprawdza, czy podano w³aœciw¹ wartoœæ, jeœli nie (userAge = -1) to wychodzi
+		if (chkMaxAge->Checked) {
+			userAge = getUserAge();
+			//Sprawdzenie, czy podano liczbê czy inny znak w edtUserAge
+			if (userAge == -1) return;
+		}
+		//pobiera wartoœæ userSize podan¹ przez u¿ytkowanika jeœli wybrano tê opcjê
+		//oraz sprawdza, czy podano w³aœciw¹ wartoœæ, jeœli nie (userSize = -1) to wychodzi
+		if (chkMaxSize->Checked){
+			userSize = getUserSize();
+			//Sprawdzenie, czy podano liczbê czy inny znak w edtUserSize
+			if (userSize == -1) return;
+		}
+		//funkcja do usuwania plików z danej lokalizacji
+		deleteFiles(returnPath());
+		if(chkRepead->Checked){
+			tmrAutoDelete->Enabled = true;
+		}
+
+		chkMaxAge->Enabled = false;
+		chkMaxSize->Enabled = false;
+		chkDeleteEmptiedCatalogs->Enabled = false;
+		chkDeleteAllEmpty->Enabled = false;
+		cbbAge->Enabled = false;
+		cbbSize->Enabled = false;
+		cbbRepeatTime->Enabled = false;
+		chkRepead->Enabled = false;
+
+		edtRepeatTime->Enabled = false;
+		edtAge->Enabled = false;
+		edtSize->Enabled = false;
+		btnAutoDelete->Caption = "Change Config";
+		btnSelect->Enabled = false;
+		buttonChangeFlag = true;
+
+		//odœwie¿enie listy plików
+		//jeœli podana œcie¿ka istnieje to wywo³aj funkcje listCatalogs
+		if (DirectoryExists(edtChosenFilePath->Text)){
+			//czyszczenie listView
+			lvFileListView->Items->Clear();
+			//wywo³anie funkcji która wype³nia ListView plikami z wybranego katalogu
+			listCatalogs(returnPath());
+		}
+	}
+	//klikniêto Change zezwala zmieniæ wartoœci w danych komórakch
+	else{
+		tmrAutoDelete->Enabled = false;
+
+		chkMaxAge->Enabled = true;
+		chkMaxSize->Enabled = true;
+		chkDeleteEmptiedCatalogs->Enabled = true;
+		chkDeleteAllEmpty->Enabled = true;
+		chkRepead->Enabled = true;
+		btnSelect->Enabled = true;
+
+		if (chkRepead->Checked) {
+			cbbRepeatTime->Enabled = true;
+			edtRepeatTime->Enabled = true;
+		}
+		if (chkMaxAge->Checked) {
+			edtAge->Enabled = true;
+			cbbAge->Enabled = true;
+		}
+		if (chkMaxSize->Checked) {
+			edtSize->Enabled = true;
+			cbbSize->Enabled = true;
+		}
+		btnAutoDelete->Caption = "Delete";
+		buttonChangeFlag = false;
+	}
+}
+//---------------------------------------------------------------------------
+void __fastcall TForm1::chkMaxAgeClick(TObject *Sender){
+	edtAge->Enabled = chkMaxAge->Checked;
+	cbbAge->Enabled = chkMaxAge->Checked;
+}
+//---------------------------------------------------------------------------
+void __fastcall TForm1::chkMaxSizeClick(TObject *Sender){
+	edtSize->Enabled = chkMaxSize->Checked;
+	cbbSize->Enabled = chkMaxSize->Checked;
+}
+//---------------------------------------------------------------------------
+void __fastcall TForm1::chkRepeadClick(TObject *Sender)
+{
+	edtRepeatTime->Enabled = chkRepead->Checked;
+	cbbRepeatTime->Enabled = chkRepead->Checked;
+
+	if(chkRepead->Checked){
+		btnAutoDelete->Caption = "Auto Delete";
+	}
+	else{
+		btnAutoDelete->Caption = "Delete";
+	}
+}
+//---------------------------------------------------------------------------
+/**
+ * deleteCheck - Funkcja sprawdza czy plik nale¿y usun¹æ czy nie
+ * @param String file - œcie¿ka do pliku sprawdzanego
+ * @return  - true jesli nale¿y usun¹æ plik, false - jeœli zachowaæ
+ */
+bool TForm1::deleteCheck(const char * fileNameChar){
+	double sizeOfFile = 0, ageOfFile = 0, userSize = 0, userAge = 0;
+	bool decision;
+
+	//pobiera ró¿nicê pomiêdzy aktualn¹ dat¹, a dat¹ pliku w postaci dni
+	ageOfFile = getDiffIntDate(fileNameChar);
+	//pobiera wartoœæ userAge podan¹ przez u¿ytkowanika jeœli wybrano tê opcjê
+	if (chkMaxAge->Checked) {
+		userAge = getUserAge();
+	}
+	//pobiera rozmiar danego pliku
+	sizeOfFile = getFileSize(fileNameChar);
+	//pobiera wartoœæ userSize podan¹ przez u¿ytkowanika jeœli wybrano tê opcjê
+	if (chkMaxSize->Checked){
+		userSize = getUserSize();
+	}
+
+	//jeœli wiek pliku jest wiêkszy ni¿ wiek podany przez u¿ytkowanika - usuwa plik
+	if (chkMaxAge->Checked && ageOfFile > userAge && !(chkMaxSize->Checked)) {
+		//DeleteFile(fileName);
+		decision = true;
+	}
+	//jeœli wielkoœæ pliku jest wiêksza ni¿ wartoœæ u¿ytkowanika - usuwa plik
+	else if (chkMaxSize->Checked && sizeOfFile >= userSize && !(chkMaxAge->Checked)) {
+		//DeleteFile(fileName);
+		decision = true;
+	}
+	//jeœli obie opcje s¹ zaznaczone (size i age)
+	else if(chkMaxAge->Checked && chkMaxSize->Checked && ageOfFile > userAge && sizeOfFile > userSize){
+		//DeleteFile(fileName);
+		decision = true;
+	}
+	else{
+		decision = false;
+    }
+
+	return decision;
+}
+//---------------------------------------------------------------------------
+/**
+ * deleteFiles - Funkcja usuwaj¹ca z katalogu "path" wybrane pliki
+ * @param String path - œcie¿ka do folderu podanego przez u¿ytkownika
+ */
+void TForm1::deleteFiles(const String &path){
+	TSearchRec sr;
+	int result = 0;
+	int resultInCatalog = 0;
+	String pathInCatalog, pathOfFolder;
+	AnsiString fileName, pathAnsiString, newPath;
+	const char * fileNameChar;
+	const char * pathChar;
+	double fileCounter = 0;
+	bool deletedFileFlag = false;
+	bool isThereAnotherCatalog = false;
+
+	//FindFirst searches the directory specified by path for the first file that
+	//matches the file name implied by path and the attributes specified by the
+	//Attr parameter. The result is returned in the sr parameter. FindFirst returns
+	//0 if a file was successfully located, otherwise, it returns an error code.
+	// faAnyFile - wybiera ka¿dy plik
+
+	//Przeszukuje najpierw wszystkie pliki oprócz folderów i wypisuje w ListView
+	if (FindFirst(path + "*.*", faAnyFile - faDirectory, sr) == 0) {
+		while (result == 0){
+			if ((sr.Name != ".") && (sr.Name != "..")){
+				//filname sk³ada siê z aktualnej œcie¿ki oraz aktualnego pliku
+				fileName = path + sr.Name;
+				//konwersja String na const char * dla funkcji getFilesize i getFileDate itp.
+				fileNameChar = fileName.c_str();
+				//sprawdza czy dany plik spe³nia warunki usuniêcia
+				if (deleteCheck(fileNameChar)) {
+					DeleteFile(fileName);
+					deletedFileFlag = true;
+					//licznik licz¹cy ile plików pozosta³o w aktualnym folderze
+					fileCounter--;
+				}
+				fileCounter++;
+			}
+			result = FindNext(sr);
+		}
+	}
+	//Przeszukuje wszystkie pliki i wybiera foldery
+	if (FindFirst(path + "*.*", faDirectory, sr) == 0){
+		while (resultInCatalog == 0){
+			if ((sr.Name != ".") && (sr.Name != "..") && (sr.Attr & faDirectory)) {
+				//dodaje do œcie¿ki aktualny folder
+				pathInCatalog = path + sr.Name + "\\";
+				//wywo³uje ponowne przeszukiwanie dla danego folderu
+				deleteFiles(pathInCatalog);
+				//flaga mowi o tym czy jest kolejny katalog wewnatrz aktualnego
+				isThereAnotherCatalog = true;
+			}
+			//szuka nastepnego pliku spe³niaj¹cego warunek
+			resultInCatalog = FindNext(sr);
+		}
+	}
+	//usuwanie pustego folderu jesli usuniêto z niego jakiekolwiek pliki
+	//i zaznaczona opcja deleteEmptyCatalogs
+	if (deletedFileFlag && fileCounter == 0 && chkDeleteEmptiedCatalogs->Checked && isThereAnotherCatalog == false) {
+		//konwersja String na const char * dla funkcji RemoveDirectory
+//		newPath = path;
+//		//path.Delete(newPath.Length(), 1);
+//		newPath.Delete(path.Length(), 1);
+//		newPath = path;
+//		newPath.Delete(newPath.Length() - 1, 1);
+//		DeleteFile(newPath);
+//		rmdir(pathChar);
+		pathAnsiString = path;
+		pathChar = pathAnsiString.c_str();
+		RemoveDirectory(pathChar);
+	}
+	//usuwa wszystkie puste katalogi jeœli zaznaczona opcja deleteAllEmptyCatalogs
+	if (chkDeleteAllEmpty->Checked) {
+		//konwersja String na const char * dla funkcji RemoveDirectory
+//		newPath = path;
+//		path.Delete(newPath.Length(), 1);
+//		newPath.Delete(path.Length(), 1);
+//		pathChar = newPath.c_str();
+
+		pathAnsiString = path;
+		pathChar = pathAnsiString.c_str();
+		RemoveDirectory(pathChar);
+	}
+	//zamyka przeszukiwanie folderu
+	FindClose(sr);
+}
+//---------------------------------------------------------------------------
+/**
+ * Funkcja zwracaj¹ca rozmiar plikow (userSize) jakie maj¹ zostaæ usuniête
+ * @return double userSize - min rozmiar plików jakie maj¹ zostaæ usuniête
+ */
+double TForm1::getUserSize(){
+	double userSize;
+
+	try {
+		userSize = this->edtSize->Text.ToDouble();
+		userSize = userSize*getSizeOption();
+	}
+	catch(EConvertError *err){
+		ShowMessage("The value you provided is an invalid number.");
+		this->edtSize->Text = "";
+		userSize = -1;
+	}
+
+	return userSize;
+}
+//---------------------------------------------------------------------------
+/**
+ * Funkcja zwracaj¹ca wiek plikow (userAge) podany przez u¿ytkownika
+ * @return double userAge - min wiek plików jakie maj¹ zostaæ usuniête
+ */
+double TForm1::getUserAge(){
+	double userAge;
+
+	try {
+		userAge = this->edtAge->Text.ToDouble();
+		userAge = userAge*getAgeOption();
+	}
+	catch(EConvertError *err){
+		ShowMessage("The value you provided is an invalid number.");
+		this->edtAge->Text = "";
+		userAge = -1;
+	}
+
+	return userAge;
+}
+//---------------------------------------------------------------------------
+/**
+ * Funkcja zwracaj¹ca wiek plikow (userAge) podany przez u¿ytkownika
+ * @return double userRepeatTime - liczba jak¹ wpisa³ u¿ytkowanik w polu edtRepeatTime
+ */
+double TForm1::getUserRepeatTime(){
+	double userRepeatTime;
+
+	try {
+		userRepeatTime = this->edtRepeatTime->Text.ToDouble();
+		userRepeatTime = userRepeatTime * getAgeOption();
+	}
+	catch(EConvertError *err){
+		ShowMessage("The value you provided is an invalid number.");
+		this->edtAge->Text = "";
+		userRepeatTime = -1;
+	}
+
+	return userRepeatTime;
+}
+//---------------------------------------------------------------------------
+/**
+ * Funkcja zwraca mno¿nik z wybranej opcji hour/day/month/year
+ * @return double choosenAgeOption - zwraca mno¿nik z wybranej opcji
+ */
+double TForm1::getAgeOption(){
+	double choosenAgeOption;
+	if(cbbAge->Text == "Seconds"){
+		choosenAgeOption = 1;
+	}
+	if(cbbAge->Text == "Minutes"){
+		choosenAgeOption = 60;
+	}
+	if(cbbAge->Text == "Hours"){
+		choosenAgeOption = 3600;
+	}
+	if(cbbAge->Text == "Days"){
+		choosenAgeOption = 86400;
+	}
+	if(cbbAge->Text == "Months"){
+		choosenAgeOption = 2592000;
+	}
+	if(cbbAge->Text == "Years"){
+		choosenAgeOption = 946080000;
+	}
+	return choosenAgeOption;
+}
+//---------------------------------------------------------------------------
+/**
+ * Funkcja zwraca mno¿nik z wybranej opcji B/KB/MB/GB
+ * @return double choosenSizeOption - zwraca mno¿nik z wybranej opcji
+ */
+double TForm1::getSizeOption(){
+	double choosenSizeOption;
+	if(cbbSize->Text == "B"){
+		choosenSizeOption = 1;
+	}
+	if(cbbSize->Text == "KB"){
+		choosenSizeOption = 1024;
+	}
+	if(cbbSize->Text == "MB"){
+		choosenSizeOption = 1048576;
+	}
+	if(cbbSize->Text == "GB"){
+		choosenSizeOption = 1073741824;
+	}
+	return choosenSizeOption;
+}
+//---------------------------------------------------------------------------
+/**
+ * Funkcja zwraca mno¿nik z wybranej opcji minute/hour/day/month/year
+ * @return double choosenTimeOption - zwraca mno¿nik z wybranej opcji
+ */
+double TForm1::getRepeadTime(){
+	double choosenTimeOption;
+	if(cbbRepeatTime->Text == "Seconds"){
+		choosenTimeOption = 1;
+	}
+	if(cbbRepeatTime->Text == "Minutes"){
+		choosenTimeOption = 60;
+	}
+	if(cbbRepeatTime->Text == "Hours"){
+		choosenTimeOption = 3600;
+	}
+	if(cbbRepeatTime->Text == "Days"){
+		choosenTimeOption = 86400;
+	}
+	if(cbbRepeatTime->Text == "Months"){
+		choosenTimeOption = 2592000;
+	}
+	if(cbbRepeatTime->Text == "Years"){
+		choosenTimeOption = 946080000;
+	}
+	return choosenTimeOption;
+}
+//---------------------------------------------------------------------------
+//Funkcja Timera powtarza usuwanie plików o podanych parametrach, co podany czas
+void __fastcall TForm1::tmrAutoDeleteTimer(TObject *Sender)
+{
+	//Wywo³anie funkcji usuwania plików na wybranej przez u¿ytkownika lokalizacji
+	deleteFiles(returnPath());
+
+	//odœwie¿enie listy plików
+	//jeœli podana œcie¿ka istnieje to wywo³aj funkcje listCatalogs
+	if (DirectoryExists(edtChosenFilePath->Text)){
+		//czyszczenie listView
+		lvFileListView->Items->Clear();
+		//wywo³anie funkcji która wype³nia ListView plikami z wybranego katalogu
+		listCatalogs(returnPath());
+	}
+}
+//---------------------------------------------------------------------------
+//Funkcja ustala minimalne rozmiary okna programu
+void __fastcall TForm1::FormResize(TObject *Sender)
+{
+	Form1->Constraints->MinHeight = 300;
+	Form1->Constraints->MinWidth = 500;
+}
+//---------------------------------------------------------------------------
+//Timer odœwie¿a aktualny czas w oknie programu
+void __fastcall TForm1::tmrAutoRefreshTimer(TObject *Sender)
+{
+	getCurrentDate();
+}
+//---------------------------------------------------------------------------
+

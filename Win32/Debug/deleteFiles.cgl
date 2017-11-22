@@ -1,0 +1,24 @@
+Error 00073. 0x820000 (Thread 0x0E88):
+Function failure:
+stat(0x02643F9C ["C:\AIC\ProjektyBuilder\doTestowDeleteFiles\doTestow\Opener
+ 2016\Sigur Ros\Agaetis Byrjun\09. Ágatis Byrjun.mp3"], 0x0019E4AC)=0xFFFFFFFF
+ [-1]
+
+Call Tree:
+   0x004032AA(=deleteFiles.exe:0x01:0022AA) FileFunctions.cpp#116
+   0x004042A2(=deleteFiles.exe:0x01:0032A2) main.cpp#112
+   0x0040496E(=deleteFiles.exe:0x01:00396E) main.cpp#139
+   0x00404C3D(=deleteFiles.exe:0x01:003C3D) main.cpp#156
+   0x00404C3D(=deleteFiles.exe:0x01:003C3D) main.cpp#156
+   0x00404C3D(=deleteFiles.exe:0x01:003C3D) main.cpp#156
+   0x00413133(=deleteFiles.exe:0x01:012133) main.cpp#1632
+   0x00412F93(=deleteFiles.exe:0x01:011F93) main.cpp#1610
+   0x005D5C91(=deleteFiles.exe:0x01:1D4C91) Vcl.Controls.pas#7320
+   0x0055295B(=deleteFiles.exe:0x01:15195B) Vcl.StdCtrls.pas#5928
+   0x005DA098(=deleteFiles.exe:0x01:1D9098) Vcl.Controls.pas#9976
+   0x00550F51(=deleteFiles.exe:0x01:14FF51) Vcl.StdCtrls.pas#5002
+   0x005DA1E8(=deleteFiles.exe:0x01:1D91E8) Vcl.Controls.pas#10045
+   0x005DA098(=deleteFiles.exe:0x01:1D9098) Vcl.Controls.pas#9976
+   0x0059A6A2(=deleteFiles.exe:0x01:1996A2) Vcl.Forms.pas#4344
+
+------------------------------------------

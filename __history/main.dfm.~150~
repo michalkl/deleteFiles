@@ -1,0 +1,499 @@
+object Form1: TForm1
+  Left = 0
+  Top = 0
+  Caption = 'Delete Files Application'
+  ClientHeight = 497
+  ClientWidth = 944
+  Color = clBtnFace
+  Font.Charset = DEFAULT_CHARSET
+  Font.Color = clWindowText
+  Font.Height = -11
+  Font.Name = 'Tahoma'
+  Font.Style = []
+  OldCreateOrder = False
+  OnCreate = FormCreate
+  OnResize = FormResize
+  DesignSize = (
+    944
+    497)
+  PixelsPerInch = 96
+  TextHeight = 13
+  object lbl1: TLabel
+    Left = 8
+    Top = 16
+    Width = 98
+    Height = 13
+    Caption = 'Selected directories:'
+  end
+  object lbl2: TLabel
+    Left = 8
+    Top = 59
+    Width = 155
+    Height = 13
+    Caption = 'List of files in selected directory:'
+  end
+  object lbl5: TLabel
+    Left = 806
+    Top = 13
+    Width = 64
+    Height = 13
+    Anchors = [akTop, akRight]
+    Caption = 'Current time:'
+    ExplicitLeft = 719
+  end
+  object lbl3: TLabel
+    Left = 690
+    Top = 70
+    Width = 126
+    Height = 13
+    Anchors = [akTop, akRight]
+    Caption = 'Auto delete configuration:'
+    ExplicitLeft = 687
+  end
+  object lblcateogryOfFiles: TLabel
+    Left = 690
+    Top = 261
+    Width = 130
+    Height = 13
+    Anchors = [akTop, akRight]
+    Caption = 'Category of files to delete:'
+    ExplicitLeft = 687
+  end
+  object lblsize: TLabel
+    Left = 690
+    Top = 449
+    Width = 99
+    Height = 13
+    Anchors = [akTop, akRight]
+    Caption = 'Size of directory (B):'
+  end
+  object edtCurrentTime: TEdit
+    Left = 806
+    Top = 32
+    Width = 122
+    Height = 21
+    Anchors = [akTop, akRight]
+    ParentShowHint = False
+    ReadOnly = True
+    ShowHint = False
+    TabOrder = 0
+  end
+  object lvFileListView: TListView
+    Left = 8
+    Top = 42
+    Width = 676
+    Height = 447
+    Anchors = [akLeft, akTop, akRight, akBottom]
+    Columns = <>
+    TabOrder = 1
+  end
+  object edtAge: TEdit
+    Left = 796
+    Top = 89
+    Width = 74
+    Height = 21
+    Anchors = [akTop, akRight]
+    Enabled = False
+    TabOrder = 2
+  end
+  object edtSize: TEdit
+    Left = 796
+    Top = 116
+    Width = 74
+    Height = 21
+    Anchors = [akTop, akRight]
+    Enabled = False
+    TabOrder = 3
+  end
+  object btnAutoDelete: TButton
+    Left = 690
+    Top = 386
+    Width = 246
+    Height = 25
+    Anchors = [akTop, akRight]
+    Caption = 'Delete'
+    Enabled = False
+    TabOrder = 4
+    OnClick = btnAutoDeleteClick
+  end
+  object chkMaxAge: TCheckBox
+    Left = 690
+    Top = 89
+    Width = 100
+    Height = 17
+    Anchors = [akTop, akRight]
+    Caption = 'Max age of a file:'
+    Enabled = False
+    TabOrder = 5
+    OnClick = chkMaxAgeClick
+  end
+  object chkMaxSize: TCheckBox
+    Left = 690
+    Top = 116
+    Width = 100
+    Height = 17
+    Anchors = [akTop, akRight]
+    Caption = 'Max size of a file:'
+    Enabled = False
+    TabOrder = 6
+    OnClick = chkMaxSizeClick
+  end
+  object chkDeleteEmptiedCatalogs: TCheckBox
+    Left = 690
+    Top = 157
+    Width = 146
+    Height = 17
+    Anchors = [akTop, akRight]
+    Caption = 'Delete emptied catalogs'
+    Enabled = False
+    TabOrder = 7
+  end
+  object chkDeleteAllEmpty: TCheckBox
+    Left = 690
+    Top = 180
+    Width = 146
+    Height = 17
+    Anchors = [akTop, akRight]
+    Caption = 'Delete all empty catalogs'
+    Enabled = False
+    TabOrder = 8
+  end
+  object cbbAge: TComboBox
+    Left = 876
+    Top = 88
+    Width = 60
+    Height = 22
+    Style = csOwnerDrawFixed
+    Anchors = [akTop, akRight]
+    Enabled = False
+    TabOrder = 9
+    Items.Strings = (
+      'Seconds'
+      'Minutes'
+      'Hours'
+      'Days'
+      'Months'
+      'Years')
+  end
+  object cbbSize: TComboBox
+    Left = 876
+    Top = 116
+    Width = 60
+    Height = 22
+    Style = csOwnerDrawFixed
+    Anchors = [akTop, akRight]
+    Enabled = False
+    TabOrder = 10
+    Items.Strings = (
+      'B'
+      'KB'
+      'MB'
+      'GB')
+  end
+  object edtRepeatTime: TEdit
+    Left = 796
+    Top = 227
+    Width = 74
+    Height = 21
+    Anchors = [akTop, akRight]
+    Enabled = False
+    TabOrder = 11
+  end
+  object cbbRepeatTime: TComboBox
+    Left = 876
+    Top = 227
+    Width = 60
+    Height = 22
+    Style = csOwnerDrawFixed
+    Anchors = [akTop, akRight]
+    Enabled = False
+    TabOrder = 12
+    Items.Strings = (
+      'Seconds'
+      'Minutes'
+      'Hours'
+      'Days'
+      'Months'
+      'Years')
+  end
+  object chkRepeat: TCheckBox
+    Left = 690
+    Top = 229
+    Width = 86
+    Height = 17
+    Anchors = [akTop, akRight]
+    Caption = 'Repeat every:'
+    Enabled = False
+    TabOrder = 13
+    OnClick = chkRepeatClick
+  end
+  object btnSaveConfig: TButton
+    Left = 861
+    Top = 434
+    Width = 75
+    Height = 25
+    Anchors = [akRight, akBottom]
+    Cancel = True
+    Caption = 'Save config'
+    TabOrder = 14
+    OnClick = btnSaveConfigClick
+  end
+  object btnLoadConfig: TButton
+    Left = 861
+    Top = 465
+    Width = 75
+    Height = 25
+    Anchors = [akRight, akBottom]
+    Cancel = True
+    Caption = 'Load config'
+    TabOrder = 15
+    OnClick = btnLoadConfigClick
+  end
+  object chkImageDelete: TCheckBox
+    Left = 690
+    Top = 300
+    Width = 86
+    Height = 17
+    Hint = 
+      'Removes files with extension:  ".bmp",  ".dib", ".jpg" '#13#10' ".png"' +
+      ', ".jpe", ".jfif", ".gif", ".tif", ".jpeg"'
+    Anchors = [akTop, akRight]
+    Caption = 'Image files'
+    Enabled = False
+    ParentShowHint = False
+    ShowHint = True
+    TabOrder = 16
+  end
+  object chkLogDelete: TCheckBox
+    Left = 690
+    Top = 320
+    Width = 66
+    Height = 17
+    Hint = 'Removes files with extension: ".log"'
+    Anchors = [akTop, akRight]
+    Caption = 'Log files'
+    Enabled = False
+    ParentShowHint = False
+    ShowHint = True
+    TabOrder = 17
+  end
+  object chkTxtDelete: TCheckBox
+    Left = 690
+    Top = 340
+    Width = 66
+    Height = 17
+    Hint = 'Removes files with extension: ".xml", "txt."'
+    Anchors = [akTop, akRight]
+    Caption = 'Text files'
+    Enabled = False
+    ParentShowHint = False
+    ShowHint = True
+    TabOrder = 18
+  end
+  object edtFileExtension: TEdit
+    Left = 786
+    Top = 359
+    Width = 101
+    Height = 21
+    Anchors = [akTop, akRight]
+    Enabled = False
+    TabOrder = 19
+  end
+  object chkOwnFileExtension: TCheckBox
+    Left = 690
+    Top = 360
+    Width = 95
+    Height = 17
+    Hint = 
+      'Removes files with user extension. Separate extensions with comm' +
+      'a ",".'
+    Anchors = [akTop, akRight]
+    Caption = 'Add extensions:'
+    Enabled = False
+    ParentShowHint = False
+    ShowHint = True
+    TabOrder = 20
+    OnClick = chkOwnFileExtensionClick
+  end
+  object chkViewFiles: TCheckBox
+    Left = 690
+    Top = 417
+    Width = 97
+    Height = 17
+    Anchors = [akTop, akRight]
+    Caption = 'View list of files'
+    TabOrder = 21
+    OnClick = chkViewFilesClick
+  end
+  object chkMaxDirSize: TCheckBox
+    Left = 690
+    Top = 204
+    Width = 110
+    Height = 17
+    Anchors = [akTop, akRight]
+    Caption = 'Max directory size:'
+    TabOrder = 22
+    OnClick = chkMaxDirSizeClick
+  end
+  object edtMaxDirSize: TEdit
+    Left = 796
+    Top = 202
+    Width = 74
+    Height = 21
+    Anchors = [akTop, akRight]
+    TabOrder = 23
+  end
+  object cbbMaxDirSize: TComboBox
+    Left = 876
+    Top = 202
+    Width = 60
+    Height = 22
+    Style = csOwnerDrawFixed
+    Anchors = [akTop, akRight]
+    TabOrder = 24
+    Items.Strings = (
+      'B'
+      'KB'
+      'MB'
+      'GB')
+  end
+  object edtProgramState: TEdit
+    Left = 899
+    Top = 5
+    Width = 37
+    Height = 21
+    Anchors = [akTop, akRight]
+    Color = clGreen
+    TabOrder = 25
+    Text = ' FREE'
+  end
+  object chkAllFilesDelete: TCheckBox
+    Left = 690
+    Top = 280
+    Width = 66
+    Height = 17
+    Anchors = [akTop, akRight]
+    Caption = 'All files'
+    TabOrder = 26
+    OnClick = chkAllFilesDeleteClick
+  end
+  object btnExtensionApply: TButton
+    Left = 890
+    Top = 357
+    Width = 45
+    Height = 25
+    Anchors = [akTop, akRight]
+    Caption = 'Apply'
+    TabOrder = 27
+    OnClick = btnExtensionApplyClick
+  end
+  object cbbSelectedPathsToDelete: TComboBox
+    Left = 151
+    Top = 13
+    Width = 533
+    Height = 22
+    Style = csOwnerDrawFixed
+    Anchors = [akLeft, akTop, akRight]
+    TabOrder = 28
+    OnChange = cbbSelectedPathsToDeleteChange
+  end
+  object btnAddPath: TButton
+    Left = 690
+    Top = 11
+    Width = 52
+    Height = 25
+    Anchors = [akTop, akRight]
+    Caption = 'Add'
+    TabOrder = 29
+    OnClick = btnAddPathClick
+  end
+  object btnDeletePath: TButton
+    Left = 748
+    Top = 11
+    Width = 52
+    Height = 25
+    Anchors = [akTop, akRight]
+    Caption = 'Delete'
+    TabOrder = 30
+    OnClick = btnDeletePathClick
+  end
+  object mmo1: TMemo
+    Left = 482
+    Top = 320
+    Width = 190
+    Height = 67
+    Lines.Strings = (
+      'mmo1')
+    TabOrder = 31
+    Visible = False
+  end
+  object edtPathsCounter: TEdit
+    Left = 112
+    Top = 13
+    Width = 33
+    Height = 21
+    ReadOnly = True
+    TabOrder = 32
+    Text = '0'
+  end
+  object cbbSizeOfDir: TComboBox
+    Left = 795
+    Top = 446
+    Width = 60
+    Height = 22
+    Style = csOwnerDrawFixed
+    Anchors = [akTop, akRight]
+    TabOrder = 33
+    Visible = False
+  end
+  object chkAutoDeleteOnStartup: TCheckBox
+    Left = 806
+    Top = 417
+    Width = 130
+    Height = 17
+    Anchors = [akTop, akRight]
+    Caption = 'Auto delete on startup'
+    TabOrder = 34
+    OnClick = chkAutoDeleteOnStartupClick
+  end
+  object edtChosenDirSize: TEdit
+    Left = 690
+    Top = 468
+    Width = 110
+    Height = 21
+    Anchors = [akTop, akRight]
+    ReadOnly = True
+    TabOrder = 35
+  end
+  object cbbChosenDirSize: TComboBox
+    Left = 806
+    Top = 467
+    Width = 41
+    Height = 22
+    Style = csOwnerDrawFixed
+    Anchors = [akTop, akRight]
+    TabOrder = 36
+    OnChange = cbbChosenDirSizeChange
+    Items.Strings = (
+      'B'
+      'KB'
+      'MB'
+      'GB')
+  end
+  object tmrAutoDelete: TTimer
+    Enabled = False
+    OnTimer = tmrAutoDeleteTimer
+    Left = 480
+    Top = 96
+  end
+  object tmrAutoRefresh: TTimer
+    OnTimer = tmrAutoRefreshTimer
+    Left = 568
+    Top = 96
+  end
+  object SaveDialog1: TSaveDialog
+    DefaultExt = '*.ini'
+    Left = 880
+    Top = 304
+  end
+end

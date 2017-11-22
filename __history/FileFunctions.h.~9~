@@ -1,0 +1,13 @@
+//---------------------------------------------------------------------------
+
+#ifndef FileFunctionsH
+#define FileFunctionsH
+#include <System.Classes.hpp>
+//---------------------------------------------------------------------------
+class FileFunctions {
+public:
+	/**/
+	static String getFileDate(const char* filename);
+	static String getCurrentDate();
+};
+#endif

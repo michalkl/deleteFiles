@@ -1,0 +1,47 @@
+//---------------------------------------------------------------------------
+
+#pragma hdrstop
+
+#include "SortMap.h"
+#include "FileFunctions.h"
+//---------------------------------------------------------------------------
+#pragma package(smart_init)
+SortMap::SortMap():dirSize(0){
+
+}
+//---------------------------------------------------------------------------
+/**
+ * addElementToListView - Funkcja wype³niaj¹ca ListView plikami znajduj¹cymi siê w katalogu
+					wybranym przez u¿ytkownika, liczy równie¿ wielkoœæ dir sizeOfDirCounter
+ * @param String path - œcie¿ka do folderu podanego przez u¿ytkownika
+ */
+void SortMap::addElementToMap(const String &path, const TSearchRec &sr){
+	//struktura FileInfo - String pathOfFile; int size; long int ageInSec;
+	FileInfo currentFile = {path, sr.Size, sr.Time};
+
+	//dodanie elementu do mapy (key - wiek pliku) (data_type - fileInfo)
+	filesMap.insert(std::pair<long long int, FileInfo>(currentFile.ageInSec, currentFile));
+
+	//zlicza wielkoœæ dir
+	dirSize += currentFile.size;
+}
+//---------------------------------------------------------------------------
+/**
+ * addElementToListView - Funkcja wype³niaj¹ca ListView plikami znajduj¹cymi siê w katalogu
+ * wybranym przez u¿ytkownika
+ * @param String path - œcie¿ka do folderu podanego przez u¿ytkownika
+ */
+void SortMap::deleteFirstElementFromMap(std::multimap<long long int, FileInfo>::iterator iter){
+	//struktura FileInfo - String pathOfFile; int size; long int ageInSec;
+	FileInfo currentFile = {path, sr.Size, sr.Time};
+
+	//iter
+
+	//usuniêcie pierwszego elementu z mapy (najstarszego pliku)
+	filesMap.erase(iter);
+
+	//zlicza wielkoœæ dir
+	dirSize -= currentFile.size;
+}
+//---------------------------------------------------------------------------/** * getDirSize - Funkcja zwraca wielkoœæ dir
+ */long long int SortMap::getDirSize(){	return dirSize;}

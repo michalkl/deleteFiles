@@ -1,0 +1,31 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<BorlandProject>
+	<Transactions>
+    <Transaction>1899-12-30 00:00:00.000.618,C:\AIC\Projekty Builder\deleteFiles\sortMap.h=C:\AIC\Projekty Builder\deleteFiles\Unit1.h</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.154,C:\AIC\Projekty Builder\deleteFolders\Unit1.dfm=C:\AIC\Projekty Builder\deleteFolders\main.dfm</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.892,C:\AIC\Projekty Builder\deleteFolders\Unit1.dfm=C:\Users\mklein\Documents\RAD Studio\Projects\Unit1.dfm</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.154,C:\AIC\Projekty Builder\deleteFolders\Unit1.h=C:\AIC\Projekty Builder\deleteFolders\main.h</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.325,C:\AIC\Projekty Builder\deleteFiles\MMain.h=C:\AIC\Projekty Builder\deleteFiles\Main.h</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.172,C:\AIC\Projekty Builder\deleteFiles\SortMap.h=C:\AIC\Projekty Builder\deleteFiles\SSortMap.h</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.325,C:\AIC\Projekty Builder\deleteFiles\MMain.dfm=C:\AIC\Projekty Builder\deleteFiles\Main.dfm</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.399,=C:\AIC\Projekty Builder\deleteFiles\Unit1.cpp</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.271,=C:\AIC\Projekty Builder\deleteFiles\Unit1.cpp</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.794,C:\AIC\Projekty Builder\deleteFiles\Unit1.cpp=C:\AIC\Projekty Builder\deleteFiles\FileFunctions.cpp</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.374,C:\AIC\Projekty Builder\deleteFolders\Project1.cbproj=C:\Users\mklein\Documents\RAD Studio\Projects\Project1.cbproj</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.835,C:\AIC\Projekty Builder\deleteFolders\Project1.cbproj=C:\AIC\Projekty Builder\deleteFolders\deleteFiles.cbproj</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.229,C:\AIC\Projekty Builder\deleteFiles\SSortMap.h=C:\AIC\Projekty Builder\deleteFiles\SortMap.h</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.154,C:\AIC\Projekty Builder\deleteFolders\Unit1.cpp=C:\AIC\Projekty Builder\deleteFolders\main.cpp</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.794,C:\AIC\Projekty Builder\deleteFiles\Unit1.h=C:\AIC\Projekty Builder\deleteFiles\FileFunctions.h</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.361,C:\AIC\Projekty Builder\deleteFolders\deleteFiles.cbproj=C:\AIC\Projekty Builder\deleteFolders\deleteFiles.cbproj</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.291,C:\AIC\Projekty Builder\deleteFiles\main.cpp=C:\AIC\Projekty Builder\deleteFiles\MMain.cpp</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.325,C:\AIC\Projekty Builder\deleteFiles\MMain.cpp=C:\AIC\Projekty Builder\deleteFiles\Main.cpp</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.892,C:\AIC\Projekty Builder\deleteFolders\Unit1.cpp=C:\Users\mklein\Documents\RAD Studio\Projects\Unit1.cpp</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.291,C:\AIC\Projekty Builder\deleteFiles\main.h=C:\AIC\Projekty Builder\deleteFiles\MMain.h</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.618,C:\AIC\Projekty Builder\deleteFiles\sortMap.cpp=C:\AIC\Projekty Builder\deleteFiles\Unit1.cpp</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.291,C:\AIC\Projekty Builder\deleteFiles\main.dfm=C:\AIC\Projekty Builder\deleteFiles\MMain.dfm</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.892,C:\AIC\Projekty Builder\deleteFolders\Unit1.h=C:\Users\mklein\Documents\RAD Studio\Projects\Unit1.h</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.360,=C:\Users\mklein\Documents\RAD Studio\Projects\Unit1.cpp</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.229,C:\AIC\Projekty Builder\deleteFiles\SSortMap.cpp=C:\AIC\Projekty Builder\deleteFiles\SortMap.cpp</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.172,C:\AIC\Projekty Builder\deleteFiles\SortMap.cpp=C:\AIC\Projekty Builder\deleteFiles\SSortMap.cpp</Transaction>
+  </Transactions>
+</BorlandProject>

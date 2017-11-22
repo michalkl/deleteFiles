@@ -1,0 +1,55 @@
+//---------------------------------------------------------------------------
+
+#pragma hdrstop
+
+#include "FileFunctions.h"
+#include <sys/stat.h>
+#include <time.h>
+//#include <string>
+#pragma package(smart_init)
+//---------------------------------------------------------------------------
+//---------------------------------------------------------------------------
+/**
+ * Pobiera datê pliku
+ * @param const char* filename - œcie¿ka do pliku
+ * @return String - Zwraca datê pliku lub -1 jeœli plik nie istnieje.
+ */
+String FileFunctions::getFileDate(const char* filename) {
+	struct stat st;
+	if(stat(filename, &st) != 0) {
+		return -1;
+	}
+
+	//konwertuje zmienn¹ st_mtime na zrozumia³¹ datê
+	time_t t = st.st_mtime;
+	struct tm *info;
+	info = localtime(&t);
+	char buffer[80];
+
+	//wyœwietla czas w zadanej konfiguracji
+	strftime(buffer,sizeof(buffer),"%d.%m.%Y %H:%M:%S", info);
+	//konwertuje char buffer na string
+	String str(buffer);
+
+	return str;
+}
+//---------------------------------------------------------------------------
+/**
+ * //Wyœwietla aktualny czas (dzieñ.miesi¹c.rok godzina:minuta:sekunda)
+ * @return String - Zwraca aktualn¹ datê.
+ */
+String FileFunctions::getCurrentDate(){
+	time_t currentTime;
+	struct tm *tmTime;
+	char buffer[80];
+
+	time(&currentTime);
+
+	tmTime = localtime(&currentTime);
+
+	//wyœwietla czas w zadanej konfiguracji
+	strftime(buffer,80,"%d.%m.%Y %H:%M:%S", tmTime);
+
+	String str(buffer);
+	return str;
+}

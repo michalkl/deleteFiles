@@ -1,0 +1,1867 @@
+//---------------------------------------------------------------------------
+
+#include <vcl.h>
+#include <FileCtrl.hpp>
+#include <sys/stat.h>
+#include <time.h>
+#include <stdio.h>
+#include <windows.h>
+#include <direct.h>
+#include <inifiles.hpp>
+#include <fstream.h>
+#include <string>
+#include <vector>
+
+#include "Main.h"
+#include "FileFunctions.h"
+#include "SortMap.h"
+#include <boost/scoped_ptr.hpp>
+//---------------------------------------------------------------------------
+#pragma package(smart_init)
+#pragma resource "*.dfm"
+TMainWindow *MainWindow;
+//---------------------------------------------------------------------------
+__fastcall TMainWindow::TMainWindow(TComponent* Owner)
+	: TForm(Owner){
+	//rysuje listê
+	createListView();
+	//ustawia wartoœci domyœlne comboBoxów itp.
+	cbbAge->ItemIndex = 4;
+	cbbSize->ItemIndex = 3;
+	cbbMaxDirSize->ItemIndex = 3;
+	cbbChosenDirSize->ItemIndex = 2;
+	cbbRepeatTime->ItemIndex = 4;
+	edtRepeatTime->Text = "1";
+	tmrAutoDelete->Enabled = false;
+	//wczytanie automatyczne ustawieñ po starcie programu
+	loadConfigFromIni();
+
+	*leakTest = new double;
+
+	*leakTest = 100;
+
+
+}
+//---------------------------------------------------------------------------
+/**
+ * deleteExceptions - Funkcja zawiera wszystkie wyj¹tki jakich nie ma usuwaæ program
+ * @param const String path - sprawdzana œcie¿ka
+ * @return bool exception - true jesli trafiono na wyj¹tek, false - jeœli nie
+ */
+bool TMainWindow::deleteExceptions(const String &path){
+	bool exception = false;
+	const int size = 5;
+	int exists[size];
+
+	for (UINT i = 0; i < size - 1; i++) {
+		exists[i] = 0;
+	}
+
+	if (path.Length() < 2) {
+		ShowMessage("Path is too short!");
+		return exception = true;
+	}
+	if (path == "C:\\") {
+		ShowMessage("Can't delete C:\\ path!");
+		return exception = true;
+	}
+	if (path == ExtractFilePath(Application->ExeName)) {
+		ShowMessage("Can't delete this path, program files!");
+		return exception = true;
+	}
+	AnsiString pathAnsi = path;
+
+	exists[0] = strstr(pathAnsi.c_str(), "\\Program Files") != NULL;
+	exists[1] = strstr(pathAnsi.c_str(), "\\windows") != NULL;
+	exists[2] = strstr(pathAnsi.c_str(), "\\Win32") != NULL;
+//	exists[3] = strstr(pathAnsi.c_str(), "\\deleteFiles") != NULL;
+
+	for (UINT i = 0; i < size - 1; i++) {
+		if (exists[i]) {
+			ShowMessage("Can't delete this path!");
+			exception = true;
+			return exception;
+		}
+	}
+
+	return exception;
+}
+//---------------------------------------------------------------------------
+/**
+ * addElementToListView - Funkcja dodaje element do ListView
+ * @param String path - œcie¿ka do folderu podanego przez u¿ytkownika
+ * @param UINT iterator - zawiera informacjê, któr¹ œcie¿kê z wektora vecOfPaths aktualnie obs³ugujemy
+ */
+void TMainWindow::addElementToListView(const String &path, const TSearchRec &sr, UINT &iterator){
+
+	//potrzebne do wyœwietlania ListView
+	TListItem *ListIt =  NULL;
+
+	//filname sk³ada siê z aktualnej œcie¿ki oraz aktualnego pliku
+	AnsiString fileName = path + sr.Name;
+
+	//konwersja String na const char * dla funkcji getFilesize i getFileDate itp.
+	const char * fileNameChar = fileName.c_str();
+	//usuwa okreœlon¹ liczbê liter ze stringa (ca³¹ œcie¿kê, oprócz nazwy pliku)
+	AnsiString fileNameDeleted = fileName;
+	//pobranie d³ugoœci ka¿dej ze œcie¿ek i usuwanie jej d³ugoœci z nazwy wyœwietlanego pliku
+	fileNameDeleted = fileNameDeleted.Delete(1, vecOfPaths[iterator].Length());
+
+	ListIt = lvFileListView->Items->Add();
+	//dodaje nazwê pliku do ListView
+	ListIt->Caption = fileNameDeleted;
+	//wpisuje do ListView rozmiar danego pliku
+	ListIt->SubItems->Add(sr.Size);
+	//wpisuje do ListView date danego pliku
+	ListIt->SubItems->Add(FileDateToDateTime(sr.Time));
+	//zwraca ró¿nicê pomiêdzy aktualn¹ dat¹, a dat¹ pliku w postaci dni
+	double diff2Days = FileFunctions::getDiffIntDate(fileNameChar);
+	diff2Days = ceil(diff2Days/86400.0);
+	ListIt->SubItems->Add(diff2Days);
+}
+//---------------------------------------------------------------------------
+/**
+ * listCatalogs - Funkcja wype³niaj¹ca ListView plikami znajduj¹cymi siê w katalogu
+ * wybranym przez u¿ytkownika
+ * @param String path - œcie¿ka do folderu podanego przez u¿ytkownika
+ * @param UINT iterator - zawiera informacjê, któr¹ œcie¿kê z wektora vecOfPaths aktualnie obs³ugujemy
+ */
+void TMainWindow::listCatalogs(const String &path, UINT &iterator){
+	TSearchRec sr;
+	int result = 0, resultInCatalog = 0;
+	String pathInCatalog;
+
+	//FindFirst searches the directory specified by path for the first file that
+	//matches the file name implied by path and the attributes specified by the
+	//Attr parameter. The result is returned in the sr parameter. FindFirst returns
+	//0 if a file was successfully located, otherwise, it returns an error code.
+	// faAnyFile - faDirectory - wybiera ka¿dy plik oprocz folderow
+
+	//Przeszukuje najpierw wszystkie pliki oprócz folderów i wypisuje
+	if (FindFirst(path + "*.*", faAnyFile - faDirectory, sr) == 0) {
+		while (result == 0){
+			if ((sr.Name != ".") && (sr.Name != "..")){
+				//funkcja wype³nia ListView
+				addElementToListView(path, sr, iterator);
+				//pozwala na dokonywanie zmian w trakcie dzia³ania pêtli
+				Application->ProcessMessages();
+			}
+			result = FindNext(sr);
+		}
+	}
+	FindClose(sr);
+	//Przeszukuje wszystkie pliki, wybiera foldery, wchodzi do srodka i ponownie przeszukuje
+	if (FindFirst(path + "*.*", faDirectory + faHidden, sr) == 0){
+		while (resultInCatalog == 0){
+			if ((sr.Name != ".") && (sr.Name != "..") && (sr.Attr & faDirectory)) {
+				//dodaje do œcie¿ki aktualny folder
+				pathInCatalog = path + sr.Name + "\\";
+				//funkcja wype³nia ListView
+				addElementToListView(path, sr, iterator);
+				//wywo³uje ponownie przeszukiwanie dla danego folderu
+				if(chkViewFiles->Checked) listCatalogs(pathInCatalog, iterator);
+			}
+			//pozwala na dokonywanie zmian w trakcie dzia³ania pêtli
+			Application->ProcessMessages();
+			resultInCatalog = FindNext(sr);
+		}
+	}
+	//zamyka przeszukiwanie folderu
+	FindClose(sr);
+
+	//wyœwietla listê
+	lvFileListView->ViewStyle = vsReport;
+}
+//---------------------------------------------------------------------------
+/**
+ * fillMaps - Funkcja dodaje elementy do mapy
+ * @param String path - œcie¿ka do folderu podanego przez u¿ytkownika
+ * @param UINT it - zawiera informacjê, któr¹ œcie¿kê z wektora vecOfPaths aktualnie obs³ugujemy
+ */
+void TMainWindow::fillMaps(const String &path, UINT &it){
+	TSearchRec sr;
+	int result = 0, resultInCatalog = 0;
+	String pathInCatalog;
+	AnsiString fileName;
+	double sizeOfFile = 0;
+
+	//FindFirst searches the directory specified by path for the first file that
+	//matches the file name implied by path and the attributes specified by the
+	//Attr parameter. The result is returned in the sr parameter. FindFirst returns
+	//0 if a file was successfully located, otherwise, it returns an error code.
+	// faAnyFile - faDirectory - wybiera ka¿dy plik oprocz folderow
+
+	//Przeszukuje najpierw wszystkie pliki oprócz folderów i wpisuje do mapy
+	if (FindFirst(path + "*.*", faAnyFile - faDirectory, sr) == 0) {
+		while (result == 0){
+			if ((sr.Name != ".") && (sr.Name != "..")){
+				//filname sk³ada siê z aktualnej œcie¿ki oraz aktualnego pliku
+				fileName = path + sr.Name;
+				//dodanie elementu do konkretnej mapy zale¿nej od iteratora
+				vecOfFilesMaps[it].addElementToMap(fileName, sr);
+				//zwiêksza licznik plików
+				numberOfFiles++;
+				//pozwala na dokonywanie zmian w trakcie dzia³ania pêtli
+				Application->ProcessMessages();
+			}
+			result = FindNext(sr);
+		}
+	}
+	FindClose(sr);
+
+	//Przeszukuje wszystkie pliki, wybiera foldery, wchodzi do srodka i ponownie przeszukuje
+	if (FindFirst(path + "*.*", faDirectory + faHidden, sr) == 0){
+		while (resultInCatalog == 0){
+			if ((sr.Name != ".") && (sr.Name != "..") && (sr.Attr & faDirectory)) {
+				//dodaje do œcie¿ki aktualny folder
+				pathInCatalog = path + sr.Name + "\\";
+				//dodanie elementu do mapy
+				vecOfFoldersMaps[it].addElementToMap(pathInCatalog, sr);
+				//wywo³uje ponownie przeszukiwanie dla danego folderu
+				fillMaps(pathInCatalog, it);
+				//pozwala na dokonywanie zmian w trakcie dzia³ania pêtli
+				Application->ProcessMessages();
+			}
+			resultInCatalog = FindNext(sr);
+		}
+	}
+	//zamyka przeszukiwanie folderu
+	FindClose(sr);
+}
+//---------------------------------------------------------------------------
+/**
+ * createListView - Funkcja rysuje listView
+ */
+void TMainWindow::createListView() {
+	TListColumn *ListCol = NULL;
+
+	//Dodaje kolumnê do lvFileListView
+	ListCol = lvFileListView->Columns->Add();
+	ListCol->Caption = "File name";
+	ListCol->Width = 300;
+	ListCol->Alignment = taRightJustify;
+
+	//Dodaje kolumnê do lvFileListView
+	ListCol = lvFileListView->Columns->Add();
+	ListCol->Caption = "Size (B)";
+	ListCol->Width = 70;
+	ListCol->Alignment = taRightJustify;
+
+	//Dodaje kolumnê do lvFileListView
+	ListCol = lvFileListView->Columns->Add();
+	ListCol->Caption = "Modification date";
+	ListCol->Width = 140;
+	ListCol->Alignment = taRightJustify;
+
+	//Dodaje kolumnê do lvFileListView
+	ListCol = lvFileListView->Columns->Add();
+	ListCol->Caption = "Age of a file (Days)";
+	ListCol->Width = 110;
+	ListCol->Alignment = taRightJustify;
+
+	//Dodaje kolumnê do lvFileListView
+	ListCol = lvFileListView->Columns->Add();
+	ListCol->Caption = " ";
+	ListCol->Width = 5;
+}
+//---------------------------------------------------------------------------
+/**
+ * btnAutoDeleteClick - Funkcja na klikniêcie przycisku Delete/Change
+ */
+void __fastcall TMainWindow::btnAutoDeleteClick(TObject *Sender){
+	//Sprawdza, czy podano liczbê czy inny znak w edtRepeatTime
+	if (chkRepeat->Checked && getUserRepeatTime() == -1) {
+		ShowMessage("Enter valid repead time!");
+		return;
+	}
+	else if (chkRepeat->Checked){
+		//ustawienie interwa³u timera do automatycznego usuwania
+		tmrAutoDelete->Interval = 1000 * getUserRepeatTime();
+	}
+	//sprawdza, czy zaznaczono jak¹kolwiek opcjê w Category of files to delete
+	if (chkImageDelete->Checked == false && chkTxtDelete->Checked == false &&
+		chkLogDelete->Checked == false && chkOwnFileExtension->Checked == false &&
+		chkAllFilesDelete->Checked == false){
+		ShowMessage("Select a category of files to delete!");
+		return;
+	}
+	//kliknieto AutoDelete - zabrania zmieniæ wartoœci w danych komórakch
+	if (buttonChangeFlag == false) {
+		//pobiera wartoœæ userAge podan¹ przez u¿ytkowanika jeœli wybrano tê opcjê
+		//oraz sprawdza, czy podano w³aœciw¹ wartoœæ, jeœli nie (userAge = -1) to wychodzi
+		if (chkMaxAge->Checked) {
+			double userAge = getUserAge();
+			//Sprawdzenie, czy podano liczbê czy inny znak w edtUserAge
+			if (userAge == -1) return;
+		}
+		//pobiera wartoœæ userSize podan¹ przez u¿ytkowanika jeœli wybrano tê opcjê
+		//oraz sprawdza, czy podano w³aœciw¹ wartoœæ, jeœli nie (userSize = -1) to wychodzi
+		if (chkMaxSize->Checked){
+			double userSize = getUserSize();
+			//Sprawdzenie, czy podano liczbê czy inny znak w edtUserSize
+			if (userSize == -1) return;
+		}
+
+		//ustawienie koloru i napisu kontrolki edtProgramState
+		programState(" BUSY", clRed);
+
+		//ustawia flagê wciœniêcia przycisku
+		buttonChangeFlag = true;
+
+		//wpisuje rozszerzenia z edtFileExtension do vecOfExtensions
+		extensionApply(buttonChangeFlag);
+
+		//odœwie¿a komponenty w oknie programu
+		refreshComponents();
+
+		//usuwanie plików
+		deleteFilesFunction();
+
+		//odœwie¿enie listy plików
+		refreshListOfFiles();
+
+		//uzupe³nienie edtChosenDirSize wielkoœci¹ aktualnie zaznaczonej œcie¿ki
+		cbbSelectedPathsToDeleteChange(NULL);
+
+		//ustawienie koloru i napisu kontrolki edtProgramState
+		programState(" FREE", clGreen);
+
+		//jeœli zaznaczona opcj¹ Repeat to w³¹cz timer
+		if(chkRepeat->Checked){
+			tmrAutoDelete->Enabled = true;
+		}
+	}
+	//klikniêto Change zezwala zmieniæ wartoœci w danych komórakch
+	else{
+		//ustawia flagê wciœniêcia przycisku
+		buttonChangeFlag = false;
+		//wy³¹czenie timera do automatyczengo usuwania
+		tmrAutoDelete->Enabled = false;
+		//wpisuje rozszerzenia z edtFileExtension do vecOfExtensions
+		extensionApply(buttonChangeFlag);
+		//odœwie¿a komponenty w oknie programu
+		refreshComponents();
+	}
+}
+//---------------------------------------------------------------------------
+/**
+ * deleteFilesFunction - zbiór funkcji do usuwania plików
+ */
+void TMainWindow::deleteFilesFunction(){
+	//wyczyszczenie map i wyzerowanie licznika dirSize
+	clearMaps();
+
+	//funkcje do usuwania plików z danej lokalizacji
+	if (chkMaxDirSize->Checked == false) {
+		//usuniêcie plików ze wszystkich œcie¿ek po kolei
+		for (UINT i = 0; i < vecOfPaths.size(); i++) {
+			//utworzenie pustych obiektów SortMap aby wpisaæ do nich póŸniej mapy
+			vecOfFilesMaps.push_back(SortMap());
+			vecOfFoldersMaps.push_back(SortMap());
+			//dodanie plików i folderów do map
+			fillMaps(vecOfPaths[i], i);
+			//usuwa wg rozmiar/wiek plików
+			deleteFiles(vecOfPaths[i], i);
+			//dodanie rozmiarów dir do wektora vecOfDirSizes
+			vecOfDirSizes[i] = vecOfFilesMaps[i].getDirSize();
+			//dodanie rozmiarów dir do cbbSizeOfDir
+			cbbSizeOfDir->Items->Add(vecOfDirSizes[i]);
+		}
+	}else{
+		//usuwa ze wszystkich œcie¿ek po kolei
+		for (UINT i = 0; i < vecOfPaths.size(); i++) {
+            //utworzenie pustych obiektów SortMap aby wpisaæ do nich póŸniej mapy
+			vecOfFilesMaps.push_back(SortMap());
+			vecOfFoldersMaps.push_back(SortMap());
+			//dodanie plików i folderów do map
+			fillMaps(vecOfPaths[i], i);
+			//dodanie aktualnej wielkoœci do wektora vecOfDirSizes
+			vecOfDirSizes.push_back(vecOfFilesMaps[i].getDirSize());
+			//usuwa najstarsze pliki aby utrzymaæ sta³y rozmiar dir
+			deleteFilesByDirSize(vecOfPaths[i], i);
+		}
+	}
+}
+//---------------------------------------------------------------------------
+/**
+ * clearMaps - Funkcja czyœci mapy plików i zeruje licznik rozmiaru dir
+ */
+void TMainWindow::clearMaps(){
+	//usuwa zawartoœæ map i zeruje licznik dirSize
+	for (UINT i = 0; i < vecOfPaths.size(); i++) {
+		//wyzerowanie licznika dirSize
+		vecOfFilesMaps[i].clearDirSize();
+	}
+
+	//wyczyszczenie map plików i folderów
+	vecOfFilesMaps.clear();
+	vecOfFoldersMaps.clear();
+	vecOfDirSizes.clear();
+}
+//---------------------------------------------------------------------------
+/**
+ * chkMaxAgeClick - Funkcja klikniêcia checkBoxa
+ */
+void __fastcall TMainWindow::chkMaxAgeClick(TObject *Sender){
+	//odœwie¿a komponenty cbb, edt, chk itd.
+	refreshComponents();
+}
+//---------------------------------------------------------------------------
+/**
+ * chkMaxSizeClick - Funkcja klikniêcia checkBoxa
+ */
+void __fastcall TMainWindow::chkMaxSizeClick(TObject *Sender){
+	//odœwie¿a komponenty cbb, edt, chk itd.
+	refreshComponents();
+}
+//---------------------------------------------------------------------------
+/**
+ * chkRepeatClick - Funkcja klikniêcia checkBoxa
+ */
+void __fastcall TMainWindow::chkRepeatClick(TObject *Sender)
+{
+	//odœwie¿a komponenty cbb, edt, chk itd.
+	refreshComponents();
+
+	//zmienia napis na przycisku btnAutoDelete w zale¿noœci od opcji
+	if(chkRepeat->Checked){
+		btnAutoDelete->Caption = "Auto Delete";
+	}
+	else{
+		btnAutoDelete->Caption = "Delete";
+	}
+}
+//---------------------------------------------------------------------------
+/**
+ * deleteCheck - Funkcja sprawdza czy plik nale¿y usun¹æ czy nie
+ * @param const char *fileNameChar - œcie¿ka do pliku sprawdzanego
+ * @return bool decision - true jesli nale¿y usun¹æ plik, false - jeœli zachowaæ
+ */
+bool TMainWindow::deleteCheck(const char * fileNameChar){
+	double sizeOfFile = 0, ageOfFile = 0, userSize = 0, userAge = 0;
+	bool decision;
+
+	//jeœli nie jest zaznaczona opcja usuwanie wg wielkoœci dir
+	if (chkMaxDirSize->Checked == false) {
+		//pobiera ró¿nicê pomiêdzy aktualn¹ dat¹, a dat¹ pliku w postaci dni
+		ageOfFile = FileFunctions::getDiffIntDate(fileNameChar);
+		//pobiera wartoœæ userAge podan¹ przez u¿ytkowanika jeœli wybrano tê opcjê
+		if (chkMaxAge->Checked) {
+			userAge = getUserAge();
+		}
+		//pobiera rozmiar danego pliku
+		sizeOfFile = FileFunctions::getFileSize(fileNameChar);
+
+		//pobiera wartoœæ userSize podan¹ przez u¿ytkowanika jeœli wybrano tê opcjê
+		if (chkMaxSize->Checked){
+			userSize = getUserSize();
+		}
+
+		//jeœli wiek pliku jest wiêkszy ni¿ wiek podany przez u¿ytkowanika - usuwa plik
+		if (chkMaxAge->Checked && ageOfFile > userAge && !(chkMaxSize->Checked)) {
+			decision = true;
+			reasonLog = "(zbyt du¿y wiek pliku)";
+		}
+		//jeœli wielkoœæ pliku jest wiêksza ni¿ wartoœæ u¿ytkowanika - usuwa plik
+		else if (chkMaxSize->Checked && sizeOfFile >= userSize && !(chkMaxAge->Checked)) {
+			decision = true;
+			reasonLog = "(zbyt du¿y rozmiar pliku)";
+		}
+		//jeœli obie opcje s¹ zaznaczone (size i age)
+		else if(chkMaxAge->Checked && chkMaxSize->Checked && ageOfFile > userAge && sizeOfFile > userSize){
+			decision = true;
+			reasonLog = "(zbyt du¿y rozmiar i wiek pliku)";
+		}
+		else{
+			decision = false;
+		}
+	}
+	//jeœli jest zaznaczona opcja usuwanie wg wielkoœci dir
+	if (chkMaxDirSize->Checked) {
+		//pobiera ró¿nicê pomiêdzy aktualn¹ dat¹, a dat¹ pliku w postaci dni
+		ageOfFile = FileFunctions::getDiffIntDate(fileNameChar);
+    }
+	//sprawdzanie rozszerzeñ itp.
+	AnsiString fileNameAnsi = fileNameChar;
+
+	if (decision) {
+		//pobranie rozszerzenia pliku (strchr - Funkcja zwraca wskaŸnik na pierwsze
+		//znalezione wyst¹pienia znaku w ³añcuchu znaków, który zosta³ przekazany jako argument.)
+		char * fileExtension = strchr(fileNameAnsi.c_str(), '.');
+
+		//rozszerzenie aktualnego pliku w postaci np. ".jpg"
+		String fileExt = fileExtension;
+
+		//sprawdzanie dla obrazów
+		if (chkImageDelete->Checked) {
+			//rozszerzenie aktualnego pliku w postaci np. ".jpg"
+
+			if (fileExt == ".bmp" || fileExt == ".dib" || fileExt == ".jpg" ||
+				fileExt == ".png" || fileExt == ".jpe" || fileExt == ".jfif" ||
+				fileExt == ".gif" || fileExt == ".tif" || fileExt == ".jpeg") {
+
+				return decision = true;
+			}else{
+				decision = false;
+			}
+		}
+		//sprawdzanie dla logów
+		if (chkLogDelete->Checked) {
+			//rozszerzenie aktualnego pliku w postaci np. ".jpg"
+
+			if (fileExt == ".log") {
+				return decision = true;
+			}else{
+				decision = false;
+			}
+		}
+		//sprawdzanie dla txt
+		if (chkTxtDelete->Checked) {
+			//rozszerzenie aktualnego pliku w postaci np. ".jpg"
+
+			if (fileExt == ".txt" || fileExt == ".xml") {
+				return decision = true;
+			}else{
+				decision = false;
+			}
+		}
+		//sprawdzanie dla w³asnego dodanego rozszerzenia
+		if(chkOwnFileExtension->Checked){
+			//rozszerzenie aktualnego pliku w postaci np. ".jpg"
+
+			//porównanie ze wszystkimi rozszerzeniami dodanymi przez usera
+			for (UINT i = 0; i < vecOfExtensions.size(); i++){
+				if (fileExt == "." + vecOfExtensions[i]) {
+					return decision = true;
+				}
+			}                   
+			decision = false;
+		}
+	}
+	return decision;
+}
+//---------------------------------------------------------------------------
+/**
+ * deleteFiles - Funkcja usuwaj¹ca z katalogu "path" wybrane pliki
+ * @param String path - œcie¿ka do folderu podanego przez u¿ytkownika
+ * @param UINT it - zawiera informacjê, któr¹ œcie¿kê z wektora vecOfPaths aktualnie obs³ugujemy
+ */
+void TMainWindow::deleteFiles(const String &path, UINT &it){
+	TSearchRec sr;
+	int result = 0;
+	int resultInCatalog = 0;
+	String pathInCatalog, pathOfFolder;
+	AnsiString fileName, pathAnsiString, newPath;
+	const char * fileNameChar;
+	const char * pathChar;
+	double fileCounter = 0;
+	bool deletedFileFlag = false;
+	bool isThereAnotherCatalog = false;
+
+	//FindFirst searches the directory specified by path for the first file that
+	//matches the file name implied by path and the attributes specified by the
+	//Attr parameter. The result is returned in the sr parameter. FindFirst returns
+	//0 if a file was successfully located, otherwise, it returns an error code.
+	// faAnyFile - wybiera ka¿dy plik
+
+	//Przeszukuje najpierw wszystkie pliki oprócz folderów i wypisuje w ListView
+	if (FindFirst(path + "*.*", faAnyFile - faDirectory, sr) == 0) {
+		while (result == 0){
+			if ((sr.Name != ".") && (sr.Name != "..")){
+				//filname sk³ada siê z aktualnej œcie¿ki oraz aktualnego pliku
+				fileName = path + sr.Name;
+				//konwersja String na const char * dla funkcji getFilesize i getFileDate itp.
+				fileNameChar = fileName.c_str();
+				//sprawdza czy dany plik spe³nia warunki usuniêcia
+				if (deleteCheck(fileNameChar)) {
+					//sprawdza, czy uda³o siê usun¹æ plik
+					if (DeleteFile(fileName) == 0){
+						//wyœwielta komunikat b³êdu usuniêcia pliku w logach
+						String fName = fileName;
+						deleteError(fName);
+					}else{
+                        //jeœli istnieje jakiœ plik w mapie
+						if (vecOfFilesMaps[it].filesMap.size() > 0) {
+							//usuniêcie elementu z mapy
+							vecOfFilesMaps[it].deleteElementFromMap(vecOfFilesMaps[it].filesMap.find(sr.Time));
+						}else{
+							//jeœli nie ma w mapie elementów
+							ShowMessage("Delete Failed - cannot delete file. Check log for failed file info.");
+							return;
+						}
+					}
+
+					deletedFileFlag = true;
+					//licznik licz¹cy ile plików pozosta³o w aktualnym folderze
+					fileCounter--;
+					fileCounterLog++;
+				}
+				fileCounter++;
+			}
+			//pozwala na dokonywanie zmian w trakcie dzia³ania pêtli
+			Application->ProcessMessages();
+			result = FindNext(sr);
+		}
+		//zapisanie logów do pliku
+		saveLogToTxt(path);
+		fileCounterLog = 0;
+	}
+	FindClose(sr);
+	//Przeszukuje wszystkie pliki i wybiera foldery
+	if (FindFirst(path + "*.*", faDirectory + faHidden, sr) == 0){
+		while (resultInCatalog == 0){
+			if ((sr.Name != ".") && (sr.Name != "..") && (sr.Attr & faDirectory)) {
+				//dodaje do œcie¿ki aktualny folder
+				pathInCatalog = path + sr.Name + "\\";
+				//wywo³uje ponowne przeszukiwanie dla danego folderu
+				deleteFiles(pathInCatalog, it);
+				//flaga mowi o tym czy jest kolejny katalog wewnatrz aktualnego
+				isThereAnotherCatalog = true;
+			}
+			//pozwala na dokonywanie zmian w trakcie dzia³ania pêtli
+			Application->ProcessMessages();
+			//szuka nastepnego pliku spe³niaj¹cego warunek
+			resultInCatalog = FindNext(sr);
+		}
+	}
+	//zamyka przeszukiwanie folderu
+	FindClose(sr);
+	//usuwanie pustego folderu jesli usuniêto z niego jakiekolwiek pliki
+	//i zaznaczona opcja deleteEmptyCatalogs
+	if (deletedFileFlag && fileCounter == 0 && chkDeleteEmptiedCatalogs->Checked && isThereAnotherCatalog == false) {
+		//konwersja String na const char * dla funkcji RemoveDirectory
+		pathAnsiString = path;
+		pathChar = pathAnsiString.c_str();
+
+		//funkcja checkIfUserDir sprawdza czy aktualny folder nie jest direm usera
+		//funkcja RemoveDirectory zwraca 1 jeœli uda³o siê usun¹æ, 0 jeœli nie
+		if (checkIfUserDir(pathAnsiString) == false && RemoveDirectory(pathChar)){
+			//ustawienie flagi usuniêcia katalogu
+			catalogDeletedFlag = true;
+			reasonLog = "(Zaznaczona opcja - Delete emptied catalogs)";
+			//zapisanie logów do pliku jeœli uda³o siê usun¹æ pusty folder
+			saveLogToTxt(pathChar);
+		}
+	}
+	//usuwa wszystkie puste katalogi jeœli zaznaczona opcja deleteAllEmptyCatalogs
+	if (chkDeleteAllEmpty->Checked) {
+		//konwersja String na const char * dla funkcji RemoveDirectory
+		pathAnsiString = path;
+		pathChar = pathAnsiString.c_str();
+
+		//funkcja checkIfUserDir sprawdza czy aktualny folder nie jest direm usera
+		//funkcja RemoveDirectory zwraca 1 jeœli uda³o siê usun¹æ, 0 jeœli nie
+		if (checkIfUserDir(pathAnsiString) == false && RemoveDirectory(pathChar)){
+			//ustawienie flagi usuniêcia katalogu
+			catalogDeletedFlag = true;
+			reasonLog = "(Zaznaczona opcja - Delete all empty catalogs)";
+			//zapisanie logów do pliku jeœli uda³o siê usun¹c pusty folder
+			saveLogToTxt(pathChar);
+		}
+	}
+	//ustawienie wartoœci w vecOfDirSizes na aktulane wartoœci dir currentSizeOfDir
+	vecOfDirSizes[it] = vecOfFilesMaps[it].getDirSize();
+}
+//---------------------------------------------------------------------------
+/**
+ * checkIfUserDir - Funkcja sprawdza, czy dana œcie¿ka to nie œcie¿ka dir podana przez usera
+ * @param String path - œcie¿ka do folderu podanego przez u¿ytkownika
+ * @return bool - true - jeœli to œcie¿ka usera (nie chcemy usun¹æ), false - jeœli nie
+ */
+bool TMainWindow::checkIfUserDir(AnsiString &path){
+	//bool checkIfCatalogIsDir = false;
+	//sprawdzenie, czy aktualny katalog jest dir usera jeœli tak, to nie usuwamy
+	for (UINT i = 0; i < vecOfPaths.size(); i++){
+		if (path == vecOfPaths[i]) {
+			return true;
+		}
+	}
+	return false;
+}
+//---------------------------------------------------------------------------
+/**
+ * deleteFilesByDirSize - Funkcja usuwaj¹ca z katalogu "path" wybrane pliki dopóki
+ * folder nie osi¹gnie zadanego rozmiaru (usuwa najstarsze pliki)
+ * @param String path - œcie¿ka do folderu podanego przez u¿ytkownika
+ * @param UINT it - zawiera informacjê, któr¹ œcie¿kê z wektora vecOfPaths aktualnie obs³ugujemy
+ */
+void TMainWindow::deleteFilesByDirSize(const String &path, UINT &it){
+	bool deleteflag = false;
+
+	AnsiString pathAnsiString;
+	const char * pathChar;
+
+	unsigned __int64 currentSizeOfDir = 0, userSizeToMaintain = 0, sizeOfDataToDelete = 0, deletedFileSizeCounter = 0;
+	//przechowuje aktualn¹ wielkoœæ dir w trakcie usuwania
+	currentSizeOfDir = StrToInt64(vecOfDirSizes[it]);
+	//wielkoœæ podana przez usera do podtrzymania przemno¿ona przez opcjê B/KB/MB/GB
+	userSizeToMaintain = edtMaxDirSize->Text.ToDouble() * getMaxDirSizeOption();
+
+	//jeœli wielkoœæ podana przez usera jest mniejsza ni¿ aktualny rozmiar dir
+	//to usuñ tyle plików ile wynosi ró¿nica pomiêdzy tymi wartoœciami
+	if (currentSizeOfDir > userSizeToMaintain) {
+		sizeOfDataToDelete = currentSizeOfDir - userSizeToMaintain;
+		deleteflag = true;
+		//dopóki suma wielkoœci plików fileSizeCounter jest mniejsza ni¿
+		//sizeOfDataToDelete usuwaj pliki od najstarszego
+		while(deletedFileSizeCounter < sizeOfDataToDelete){
+			//jeœli nie ma plików w mapie to przerwij
+			if (vecOfFilesMaps[it].filesMap.size() == 0) {
+			   break;
+			}
+			//pêtla sprawdza, czy uda³o siê usun¹æ dany plik, jeœli nie, usuwa nastêpny
+			//do skutku, a¿ osi¹gniêty zostanie zadany poziom dir
+			while (DeleteFile(vecOfFilesMaps[it].filesMap.begin()->second.pathOfFile) == 0) {
+				//wyœwielta komunikat b³êdu usuniêcia pliku w logach
+				deleteError(vecOfFilesMaps[it].filesMap.begin()->second.pathOfFile);
+				//jeœli istnieje jakiœ plik w mapie
+				if (vecOfFilesMaps[it].filesMap.size() > 0) {
+					//usuniêcie pierwszego elementu z mapy
+					vecOfFilesMaps[it].deleteElementFromMap(vecOfFilesMaps[it].filesMap.begin());
+				}else{
+					//jeœli nie ma w mapie elementów
+					ShowMessage("Delete Failed - cannot delete file. Check log for failed file info. (Probably incorrect file name and dir empty beside it.)");
+					return;
+				}
+			}
+			//zwiêkszenie deletedFileSizeCounter o rozmiar aktualnego pliku
+			deletedFileSizeCounter += vecOfFilesMaps[it].filesMap.begin()->second.size;
+
+			//usuniêcie pierwszego elementu z mapy
+			vecOfFilesMaps[it].deleteElementFromMap(vecOfFilesMaps[it].filesMap.begin());
+
+			//wpisanie aktualnego rozmiaru dir do zmiennej
+			currentSizeOfDir = vecOfFilesMaps[it].getDirSize();
+
+			//pozwala na dokonywanie zmian w trakcie dzia³ania pêtli
+			Application->ProcessMessages();
+
+			//iterator licznika do logów
+			fileCounterLog++;
+		}
+		//zapisanie logów do pliku
+		String convertToStr = deletedFileSizeCounter;
+		reasonLog = " (Utrzymanie wielkosci dir, w sumie usunieto: " + convertToStr + " B)";
+		saveLogToTxt(vecOfPaths[it]);
+		//zerowanie licznika logów
+		fileCounterLog = 0;
+	}
+	//usuwa wszystkie puste katalogi jeœli zaznaczona opcja deleteAllEmptyCatalogs
+	if (chkDeleteAllEmpty->Checked) {
+		for (std::multimap<long long int, FileInfo>::iterator iter = vecOfFoldersMaps[it].filesMap.begin(); iter != vecOfFoldersMaps[it].filesMap.end(); ++iter) {
+			//konwersja String na const char * dla funkcji RemoveDirectory
+			pathAnsiString = iter->second.pathOfFile;
+			pathChar = pathAnsiString.c_str();
+			//jeœli uda³o siê usun¹æ folder usuñ równie¿ z wektora
+			if (RemoveDirectory(pathChar)){
+				//usuniêcie elementu z mapy jeœli uda³o siê usun¹æ pusty folder
+				vecOfFoldersMaps[it].deleteElementFromMap(iter);
+			}
+		}
+	}
+	//ustawienie wartoœci w vecOfDirSizes na aktulane wartoœci dir currentSizeOfDir
+	vecOfDirSizes[it] = vecOfFilesMaps[it].getDirSize();
+
+	//jeœli usuniêto jakiœ plik to zmieñ wartoœæ dir size w comboBox
+	if (deleteflag) {
+		//wype³nienie cbbSizeOfDir
+		fillCbbSizeOfDir();
+		deleteflag = false;
+	}
+}
+//---------------------------------------------------------------------------
+/**
+ * getUserSize - Funkcja zwracaj¹ca rozmiar plikow (userSize) jakie maj¹ zostaæ usuniête
+ * @return double userSize - min rozmiar plików jakie maj¹ zostaæ usuniête
+ */
+double TMainWindow::getUserSize(){
+	double userSize;
+
+	try {
+		userSize = this->edtSize->Text.ToDouble();
+		if (userSize < 0) {
+			String error = "xxx";
+			error = error.ToDouble();
+		}
+		//przemno¿enie przez wybran¹ opcjê u¿ytkowanika
+		userSize = userSize*getSizeOption();
+	}
+	catch(EConvertError *err){
+		ShowMessage("The value you provided is an invalid number.");
+		this->edtSize->Text = "";
+		userSize = -1;
+	}
+
+	return userSize;
+}
+//---------------------------------------------------------------------------
+/**
+ * getUserAge - Funkcja zwracaj¹ca wiek plikow (userAge) podany przez u¿ytkownika
+ * @return double userAge - min wiek plików jakie maj¹ zostaæ usuniête
+ */
+double TMainWindow::getUserAge(){
+	double userAge;
+
+	try {
+		userAge = this->edtAge->Text.ToDouble();
+		if (userAge < 0) {
+			String error = "xxx";
+			error = error.ToDouble();
+		}
+		//przemno¿enie przez wybran¹ opcjê u¿ytkowanika
+		userAge = userAge*getAgeOption();
+	}
+	catch(EConvertError *err){
+		ShowMessage("The value you provided is an invalid number.");
+		this->edtAge->Text = "";
+		userAge = -1;
+	}
+
+	return userAge;
+}
+//---------------------------------------------------------------------------
+/**
+ * getUserRepeatTime - Funkcja zwracaj¹ca wiek plików (userAge) podany przez u¿ytkownika
+ * @return double userRepeatTime - liczba jak¹ wpisa³ u¿ytkowanik w polu edtRepeatTime
+ */
+double TMainWindow::getUserRepeatTime(){
+	double userRepeatTime;
+
+	try {
+		userRepeatTime = this->edtRepeatTime->Text.ToDouble();
+		if (userRepeatTime <= 0) {
+			String error = "xxx";
+			error = error.ToDouble();
+		}
+		//przemno¿enie przez wybran¹ opcjê u¿ytkowanika
+		userRepeatTime = userRepeatTime * getRepeadTime();
+	}
+	catch(EConvertError *err){
+		ShowMessage("The value you provided is an invalid number.");
+		this->edtAge->Text = "";
+		userRepeatTime = -1;
+	}
+
+	return userRepeatTime;
+}
+//---------------------------------------------------------------------------
+/**
+ * getAgeOption - Funkcja zwraca mno¿nik z wybranej opcji hour/day/month/year
+ * @return double choosenAgeOption - zwraca mno¿nik z wybranej opcji
+ */
+double TMainWindow::getAgeOption(){
+	double choosenAgeOption;
+	if(cbbAge->ItemIndex == 0){
+		choosenAgeOption = 1;
+	}else if(cbbAge->ItemIndex == 1){
+		choosenAgeOption = 60;
+	}else if(cbbAge->ItemIndex == 2){
+		choosenAgeOption = 3600;
+	}else if(cbbAge->ItemIndex == 3){
+		choosenAgeOption = 86400;
+	}else if(cbbAge->ItemIndex == 4){
+		choosenAgeOption = 2592000;
+	}else if(cbbAge->ItemIndex == 5){
+		choosenAgeOption = 946080000;
+	}
+	return choosenAgeOption;
+}
+//---------------------------------------------------------------------------
+/**
+ * getMaxDirSizeOption - Funkcja zwraca mno¿nik z wybranej opcji B/KB/MB/GB
+ * @return double choosenSizeOption - zwraca mno¿nik z wybranej opcji
+ */
+double TMainWindow::getMaxDirSizeOption(){
+	double choosenSizeOption;
+	if(cbbMaxDirSize->ItemIndex == 0){
+		choosenSizeOption = 1;
+	}else if(cbbMaxDirSize->ItemIndex == 1){
+		choosenSizeOption = 1024;
+	}else if(cbbMaxDirSize->ItemIndex == 2){
+		choosenSizeOption = 1048576;
+	}else if(cbbMaxDirSize->ItemIndex == 3){
+		choosenSizeOption = 1073741824;
+	}
+	return choosenSizeOption;
+}
+//---------------------------------------------------------------------------
+/**
+ * getChosenDirSizeOption - Funkcja zwraca mno¿nik z wybranej opcji B/KB/MB/GB
+ * @return double choosenSizeOption - zwraca mno¿nik z wybranej opcji
+ */
+double TMainWindow::getChosenDirSizeOption(){
+	double choosenSizeOption;
+	if(cbbChosenDirSize->ItemIndex == 0){
+		choosenSizeOption = 1;
+	}else if(cbbChosenDirSize->ItemIndex == 1){
+		choosenSizeOption = 1024;
+	}else if(cbbChosenDirSize->ItemIndex == 2){
+		choosenSizeOption = 1048576;
+	}else if(cbbChosenDirSize->ItemIndex == 3){
+		choosenSizeOption = 1073741824;
+	}
+	return choosenSizeOption;
+}
+//---------------------------------------------------------------------------
+/**
+ * getSizeOption - Funkcja zwraca mno¿nik z wybranej opcji B/KB/MB/GB
+ * @return double choosenSizeOption - zwraca mno¿nik z wybranej opcji
+ */
+double TMainWindow::getSizeOption(){
+	double choosenSizeOption;
+	if(cbbSize->ItemIndex == 0){
+		choosenSizeOption = 1;
+	}else if(cbbSize->ItemIndex == 1){
+		choosenSizeOption = 1024;
+	}else if(cbbSize->ItemIndex == 2){
+		choosenSizeOption = 1048576;
+	}else if(cbbSize->ItemIndex == 3){
+		choosenSizeOption = 1073741824;
+	}
+	return choosenSizeOption;
+}
+//---------------------------------------------------------------------------
+/**
+ * getRepeadTime - Funkcja zwraca mno¿nik z wybranej opcji minute/hour/day/month/year
+ * @return double choosenTimeOption - zwraca mno¿nik z wybranej opcji
+ */
+double TMainWindow::getRepeadTime(){
+	double choosenTimeOption;
+	if(cbbRepeatTime->ItemIndex == 0){
+		choosenTimeOption = 1;
+	}else if(cbbRepeatTime->ItemIndex == 1){
+		choosenTimeOption = 60;
+	}else if(cbbRepeatTime->ItemIndex == 2){
+		choosenTimeOption = 3600;
+	}else if(cbbRepeatTime->ItemIndex == 3){
+		choosenTimeOption = 86400;
+	}else if(cbbRepeatTime->ItemIndex == 4){
+		choosenTimeOption = 2592000;
+	}else if(cbbRepeatTime->ItemIndex == 5){
+		choosenTimeOption = 946080000;
+	}
+	return choosenTimeOption;
+}
+//---------------------------------------------------------------------------
+/**
+ * sendToTxt - Funkcja zapisuje logi do pliku txt o zadanej scie¿ce
+ * @param String text - tekst wysy³any do pliku txt
+ */
+void TMainWindow::sendToTxt(const String &text){
+	//œcie¿ka pliku log o nazwie log_aktualna data
+	String path = ExtractFilePath(Application->ExeName)+"Log\\" + "log_" + FileFunctions::getCurrentDay() + ".txt";
+	//utworzenie obiektu outfile klasy istream z ustawieniem trybu otwarcia na dopisywanie
+	ofstream outfile(path.c_str(), ios::app);
+	//je¿eli tworzenie obiektu zakoñczy siê niepowodzeniem to przerwij operacjê
+	if (!outfile) return;
+
+	AnsiString text2 = text;
+	//konwersja AnsiString na const char * dla funkcji outfile
+	const char * buff = text2.c_str();
+	outfile << buff << endl;
+	//zamykanie pliku
+	outfile.close();
+}
+//---------------------------------------------------------------------------
+/**
+ * deleteError - Funkcja zapisuje logi Errora do pliku txt o zadanej scie¿ce
+ * @param String pathOfFile - œcie¿ka pliku który spowodowa³ error
+ */
+void TMainWindow::deleteError(const String &pathOfFile){
+	String textToSend = FileFunctions::getCurrentTime() + " - " + pathOfFile + " - NIE UDALO SIE USUNAC PLIKU - SPRAWDZ DLACZEGO!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" + char(13) + char(10);
+	sendToTxt(textToSend);
+}
+//---------------------------------------------------------------------------
+/**
+ * saveLogToTxt - Funkcja zapisuje logi do pliku txt o zadanej scie¿ce
+ * @param String pathOfFolder - folder który aktualnie jest logowany
+ */
+void TMainWindow::saveLogToTxt(const String &pathOfFolder){
+	if (fileCounterLog) {
+		String textToSend = FileFunctions::getCurrentTime() + " - " + pathOfFolder + " - Usunieto " + fileCounterLog + " plikow." + reasonLog + char(13) + char(10);
+		sendToTxt(textToSend);
+	}
+	if (catalogDeletedFlag) {
+		String textToSend = FileFunctions::getCurrentTime() + " - " + pathOfFolder + " - Usunieto pusty folder." + reasonLog + char(13) + char(10);
+		sendToTxt(textToSend);
+		catalogDeletedFlag = false;
+	}
+}
+//---------------------------------------------------------------------------
+/**
+ * tmrAutoDeleteTimer - Funkcja Timera powtarza usuwanie plików o podanych parametrach, co podany czas
+ */
+void __fastcall TMainWindow::tmrAutoDeleteTimer(TObject *Sender){
+	//jeœli program jest wolny to odœwie¿, je¿li zajêty, to nie przerywaj dzia³ania
+	if (edtProgramState->Color == clGreen) {
+		//ustawienie koloru i napisu kontrolki edtProgramState
+		programState(" BUSY", clRed);
+
+		//usuwanie plików
+		deleteFilesFunction();
+
+		//wype³nienie cbbSizeOfDir
+		fillCbbSizeOfDir();
+
+		//odœwie¿enie listy plików
+		refreshListOfFiles();
+
+		//uzupe³nienie edtChosenDirSize wielkoœci¹ aktualnie zaznaczonej œcie¿ki
+		cbbSelectedPathsToDeleteChange(NULL);
+
+		//wyzerowanie liczników plików
+		fileCounterLog = 0;
+		catalogDeletedFlag = false;
+
+		//ustawienie koloru i napisu kontrolki edtProgramState
+		programState(" FREE", clGreen);
+	}
+}
+//---------------------------------------------------------------------------
+/**
+ * FormResize - Funkcja ustala minimalne rozmiary okna programu
+ */
+void __fastcall TMainWindow::FormResize(TObject *Sender){
+	MainWindow->Constraints->MinHeight = 540;
+	MainWindow->Constraints->MinWidth = 540;
+}
+//---------------------------------------------------------------------------
+/**
+ * tmrAutoRefreshTimer - Timer odœwie¿a aktualny czas w oknie programu
+ */
+void __fastcall TMainWindow::tmrAutoRefreshTimer(TObject *Sender){
+	edtCurrentTime->Text = FileFunctions::getCurrentDate();
+}
+//---------------------------------------------------------------------------
+/*
+ * refreshComponents - Funkcja odœwie¿a wszystkie parametry kontrolek i innych komponentów programu
+ */
+void TMainWindow::refreshComponents(){
+	//chkRepeatClick
+	edtRepeatTime->Enabled = chkRepeat->Checked;
+	cbbRepeatTime->Enabled = chkRepeat->Checked;
+
+	if(chkRepeat->Checked){
+		btnAutoDelete->Caption = "Auto Delete";
+	}
+	else if (chkRepeat->Checked == false && buttonChangeFlag == false){
+		btnAutoDelete->Caption = "Delete";
+	}
+
+	//chkMaxAgeClick
+	edtAge->Enabled = chkMaxAge->Checked;
+	cbbAge->Enabled = chkMaxAge->Checked;
+
+	//chkMaxSizeClick
+	edtSize->Enabled = chkMaxSize->Checked;
+	cbbSize->Enabled = chkMaxSize->Checked;
+
+	//chkOwnFileExtension
+	edtFileExtension->Enabled = chkOwnFileExtension->Checked;
+
+	//chkMaxDirSize
+	edtMaxDirSize->Enabled = chkMaxDirSize->Checked;
+	cbbMaxDirSize->Enabled = chkMaxDirSize->Checked;
+
+	//jeœli opcja allFiles to odznacza wszystkie inne opcje rozszerzeñ
+	if (chkAllFilesDelete->Checked) {
+		chkImageDelete->Checked = false;
+		chkTxtDelete->Checked = false;
+		chkLogDelete->Checked = false;
+		chkOwnFileExtension->Checked = false;
+		chkImageDelete->Enabled = false;
+		chkTxtDelete->Enabled = false;
+		chkLogDelete->Enabled = false;
+		chkOwnFileExtension->Enabled = false;
+	}
+
+	//jeœli wybrano œcie¿kê 
+	if (selectFlag == true) {
+		btnAutoDelete->Enabled = true;
+		chkMaxAge->Enabled = true;
+		chkMaxSize->Enabled = true;
+		chkDeleteEmptiedCatalogs->Enabled = true;
+		chkDeleteAllEmpty->Enabled = true;
+		chkRepeat->Enabled = true;
+
+		//jeœli opcja chkMaxDirSize zaznaczona to odznacz chkMaxAgeClick i chkMaxSizeClick
+		if (chkMaxDirSize->Checked) {
+			chkMaxAge->Checked = false;
+			chkMaxAge->Enabled = false;
+
+			chkMaxSize->Checked = false;
+			chkMaxSize->Enabled = false;
+		}else {
+			chkMaxAge->Enabled = true;
+
+			chkMaxSize->Enabled = true;
+		}
+
+		//rozszerzenia plików
+		chkImageDelete->Enabled = true;
+		chkTxtDelete->Enabled = true;
+		chkLogDelete->Enabled = true;
+		chkOwnFileExtension->Enabled = true;
+
+		//jeœli opcja allFiles to odznacza wszystkie inne opcje rozszerzeñ
+		if (chkAllFilesDelete->Checked) {
+			chkImageDelete->Checked = false;
+			chkTxtDelete->Checked = false;
+			chkLogDelete->Checked = false;
+			chkOwnFileExtension->Checked = false;
+			chkImageDelete->Enabled = false;
+			chkTxtDelete->Enabled = false;
+			chkLogDelete->Enabled = false;
+			chkOwnFileExtension->Enabled = false;
+		}
+
+		selectFlag = false;
+	}
+
+	if (buttonChangeFlag) {
+		//jeœli klikniêto przycisk delete/autoDelete to blokuje kontrolki
+		chkMaxAge->Enabled = false;
+		chkMaxSize->Enabled = false;
+		chkDeleteEmptiedCatalogs->Enabled = false;
+		chkDeleteAllEmpty->Enabled = false;
+		cbbAge->Enabled = false;
+		cbbSize->Enabled = false;
+		cbbRepeatTime->Enabled = false;
+		chkRepeat->Enabled = false;
+		chkMaxDirSize->Enabled = false;
+		edtMaxDirSize->Enabled = false;
+		cbbMaxDirSize->Enabled = false;
+		chkViewFiles->Enabled = false;
+		chkAutoDeleteOnStartup->Enabled = false;
+
+		//rozszerzenia plków
+		chkAllFilesDelete->Enabled = false;
+		chkImageDelete->Enabled = false;
+		chkTxtDelete->Enabled = false;
+		chkLogDelete->Enabled = false;
+		chkOwnFileExtension->Enabled = false;
+		edtFileExtension->Enabled = false;
+
+		edtRepeatTime->Enabled = false;
+		edtAge->Enabled = false;
+		edtSize->Enabled = false;
+		btnAutoDelete->Caption = "Change Config";
+		btnAddPath->Enabled = false;
+		btnDeletePath->Enabled = false;
+		btnLoadConfig->Enabled = false;
+	}
+	else{
+		chkMaxAge->Enabled = true;
+		chkMaxSize->Enabled = true;
+		chkDeleteEmptiedCatalogs->Enabled = true;
+		chkDeleteAllEmpty->Enabled = true;
+		chkRepeat->Enabled = true;
+		btnAddPath->Enabled = true;
+		btnDeletePath->Enabled = true;
+		chkMaxDirSize->Enabled = true;
+		chkViewFiles->Enabled = true;
+		chkAutoDeleteOnStartup->Enabled = true;
+
+		//jeœli opcja chkMaxDirSize zaznaczona to odznacz chkMaxAgeClick i chkMaxSizeClick
+		//oraz odznacz opcje rozszerzeñ, zaznacz opcjê 'all'
+		if (chkMaxDirSize->Checked) {
+			chkMaxAge->Checked = false;
+			chkMaxAge->Enabled = false;
+
+			chkMaxSize->Checked = false;
+			chkMaxSize->Enabled = false;
+
+			chkAllFilesDelete->Checked = true;
+		}else {
+			chkMaxAge->Enabled = true;
+			chkMaxSize->Enabled = true;
+		}
+
+		//rozszerzenia plków
+		chkAllFilesDelete->Enabled = true;
+		chkImageDelete->Enabled = true;
+		chkTxtDelete->Enabled = true;
+		chkLogDelete->Enabled = true;
+		chkOwnFileExtension->Enabled = true;
+
+		//jeœli opcja allFiles to odznacza wszystkie inne opcje rozszerzeñ
+		if (chkAllFilesDelete->Checked) {
+			chkImageDelete->Checked = false;
+			chkTxtDelete->Checked = false;
+			chkLogDelete->Checked = false;
+			chkOwnFileExtension->Checked = false;
+			chkImageDelete->Enabled = false;
+			chkTxtDelete->Enabled = false;
+			chkLogDelete->Enabled = false;
+			chkOwnFileExtension->Enabled = false;
+		}
+
+		if(chkRepeat->Checked){
+			btnAutoDelete->Caption = "Auto Delete";
+		}
+		else if (chkRepeat->Checked == false && buttonChangeFlag == false){
+			btnAutoDelete->Caption = "Delete";
+		}
+		btnLoadConfig->Enabled = true;
+	}
+
+	if (loadCfgFlag) {
+		btnAutoDelete->Enabled = true;
+		chkMaxAge->Enabled = true;
+		chkMaxSize->Enabled = true;
+		chkDeleteEmptiedCatalogs->Enabled = true;
+		chkDeleteAllEmpty->Enabled = true;
+		chkRepeat->Enabled = true;
+
+		//rozszerzenia plków
+		chkImageDelete->Enabled = true;
+		chkTxtDelete->Enabled = true;
+		chkLogDelete->Enabled = true;
+		chkOwnFileExtension->Enabled = true;
+
+		//jeœli opcja chkMaxDirSize zaznaczona to odznacz chkMaxAgeClick i chkMaxSizeClick
+		if (chkMaxDirSize->Checked) {
+			chkMaxAge->Checked = false;
+			chkMaxAge->Enabled = false;
+
+			chkMaxSize->Checked = false;
+			chkMaxSize->Enabled = false;
+
+			chkAllFilesDelete->Checked = true;
+		}
+
+		//jeœli opcja allFiles to odznacza wszystkie inne opcje rozszerzeñ
+		if (chkAllFilesDelete->Checked) {
+			chkImageDelete->Checked = false;
+			chkTxtDelete->Checked = false;
+			chkLogDelete->Checked = false;
+			chkOwnFileExtension->Checked = false;
+			chkImageDelete->Enabled = false;
+			chkTxtDelete->Enabled = false;
+			chkLogDelete->Enabled = false;
+			chkOwnFileExtension->Enabled = false;
+		}
+
+		loadCfgFlag = false;
+	}
+}
+//---------------------------------------------------------------------------
+/*
+ * btnSaveConfigClick - Funkcja wywo³uje zapisanie ustawieñ do pliku ini
+ */
+void __fastcall TMainWindow::btnSaveConfigClick(TObject *Sender){
+	saveConfigToIni();
+}
+//---------------------------------------------------------------------------
+/**
+ * checkDot - Funkcja sprawdza, czy w stringu jest kropka, jeœli tak to znaczy,
+ * ¿e podano rozszerzenie pliku
+ * @param UnicodeString input - ³añcuch string do sprawdzenia czy jest w nim "."
+ * @return bool - true - jeœli jest kropka, false - jeœli nie ma
+ */
+bool TMainWindow::checkDot(String input){
+	for (int i = 1; i <= input.Length(); i++) {
+		if(input.SubString(i,1) == ".") {
+			return true;
+		}
+	}
+	return false;
+}
+//---------------------------------------------------------------------------
+/**
+ * deleteExtFromFile - Funkcja usuwa ze stringa rozszerzenie wraz z kropk¹
+ * @param UnicodeString input - ³añcuch string z którego usuwamy rozszerzenie
+ * @return String fileNameNoExt - ³añcuch string bez rozszerzenia
+ */
+String TMainWindow::deleteExtFromFile(String &input){
+	int posOfDot = 0;
+
+	//przeszukuje Stringa i znajduje pozycje kropki
+	for (int i = 1; i <= input.Length(); i++) {
+		if(input.SubString(i,1) == ".") {
+			posOfDot = i;
+		}
+	}
+
+	//string z usuniêtym rozszerzeniem
+	String fileNameNoExt = input.SubString(1, posOfDot - 1);
+
+	return fileNameNoExt;
+}
+//---------------------------------------------------------------------------
+/*
+ * saveConfigToIni - Funkcja zapisuje aktualne ustawienia usuwania do pliku ini
+ */
+void TMainWindow::saveConfigToIni(){
+	boost::scoped_ptr<TIniFile> Ini;
+
+	boost::scoped_ptr<TSaveDialog> SaveDialog1(new TSaveDialog(this));
+	SaveDialog1->Title = "Save a canfiguration file";	//tytu³
+	SaveDialog1->Filter = L"Ini Files (*.ini)|*.ini|";	//wybranie rozszerzeñ plików jakie mog¹ zostaæ zapisane
+
+	//jeœli nie klikniêto zapisz, to wróæ
+	if (SaveDialog1->Execute() == false) {
+		return;
+	}
+
+	//przeszukanie stringa SaveDialog1->FileName, jesli jest "." zamieniamy to co po "." na ".ini",
+	//jeœli nie, to dodajemy ".ini" do koñca stringa
+	if (checkDot(SaveDialog1->FileName)) {
+		String bufor = SaveDialog1->FileName;
+		//utworzenie pliku Ini
+		Ini.reset(new TIniFile(deleteExtFromFile(bufor) + ".ini"));
+	}else{
+		//utworzenie pliku Ini
+		Ini.reset(new TIniFile(SaveDialog1->FileName + ".ini"));
+	}
+
+	//usuniêcie zawartoœci ini przed zapisaniem aktualnych wartosci
+	Ini->EraseSection("Section1");
+
+	//zapisanie countera œcie¿ek
+	Ini->WriteString("Section1", "Zawartosc edtPathsCounter", edtPathsCounter->Text);
+	//zapisanie wektora ze œcie¿kami do usuwania
+	for (UINT i = 0; i < vecOfPaths.size(); i++) {
+		Ini->WriteString("Section1", "Zawartosc wektora sciezek " + StrToInt(i), vecOfPaths[i]);
+	}
+	//zapiasnie ustawieñ wieku pliku
+	Ini->WriteBool("Section1", "Ustawienia chkMaxAge", chkMaxAge->Checked);// zapisywanie wartoœci true/false do sekcji [Section1].
+	Ini->WriteString("Section1", "Zawartosc edtAge", edtAge->Text); // zapisywanie tekstu do sekcji [Section1].
+	Ini->WriteInteger("Section1", "Zawartosc cbbAge", cbbAge->ItemIndex); // zapisywanie tekstu do sekcji [Section1].
+	//zapiasnie ustawieñ rozmiaru pliku
+	Ini->WriteBool("Section1", "Ustawienia chkMaxSize", chkMaxSize->Checked);// zapisywanie wartoœci true/false do sekcji [Section1].
+	Ini->WriteString("Section1", "Zawartosc edtSize", edtSize->Text); // zapisywanie tekstu do sekcji [Section1].
+	Ini->WriteInteger("Section1", "Zawartosc cbbSize", cbbSize->ItemIndex); // zapisywanie tekstu do sekcji [Section1].
+	//zapiasnie ustawieñ automatycznego powtarzania usuwania
+	Ini->WriteBool("Section1", "Ustawienia chkRepeat", chkRepeat->Checked);// zapisywanie wartoœci true/false do sekcji [Section1].
+	Ini->WriteString("Section1", "Zawartosc edtRepeatTime", edtRepeatTime->Text); // zapisywanie tekstu do sekcji [Section1].
+	Ini->WriteInteger("Section1", "Ustawienia cbbRepeatTime", cbbRepeatTime->ItemIndex);// zapisywanie wartoœci true/false do sekcji [Section1].
+	//zapisaywanie checkBoxów usuwania folderów
+	Ini->WriteBool("Section1", "Ustawienia chkDeleteEmptiedCatalogs", chkDeleteEmptiedCatalogs->Checked);// zapisywanie wartoœci true/false do sekcji [Section1].
+	Ini->WriteBool("Section1", "Ustawienia chkDeleteAllEmpty", chkDeleteAllEmpty->Checked);// zapisywanie wartoœci true/false do sekcji [Section1].
+	//zapisywanie usatwieñ kategorii plików (rozszerzeñ) do usuniêcia
+	Ini->WriteBool("Section1", "Ustawienia chkAllFilesDelete", chkAllFilesDelete->Checked);// zapisywanie wartoœci true/false do sekcji [Section1].
+	Ini->WriteBool("Section1", "Ustawienia chkImageDelete", chkImageDelete->Checked);// zapisywanie wartoœci true/false do sekcji [Section1].
+	Ini->WriteBool("Section1", "Ustawienia chkTxtDelete", chkTxtDelete->Checked);// zapisywanie wartoœci true/false do sekcji [Section1].
+	Ini->WriteBool("Section1", "Ustawienia chkLogDelete", chkLogDelete->Checked);// zapisywanie wartoœci true/false do sekcji [Section1].
+	Ini->WriteBool("Section1", "Ustawienia chkOwnFileExtension", chkOwnFileExtension->Checked);// zapisywanie wartoœci true/false do sekcji [Section1].
+	Ini->WriteString("Section1", "Zawartosc edtFileExtension", edtFileExtension->Text); // zapisywanie tekstu do sekcji [Section1].
+	//zapiasnie ustawieñ max rozmiaru directory
+	Ini->WriteBool("Section1", "Ustawienia chkMaxDirSize", chkMaxDirSize->Checked);// zapisywanie wartoœci true/false do sekcji [Section1].
+	Ini->WriteString("Section1", "Zawartosc edtMaxDirSize", edtMaxDirSize->Text); // zapisywanie tekstu do sekcji [Section1].
+	Ini->WriteInteger("Section1", "Zawartosc cbbMaxDirSize", cbbMaxDirSize->ItemIndex); // zapisywanie tekstu do sekcji [Section1].
+	//zapisanie autoDelete na starcie
+	Ini->WriteBool("Section1", "Ustawienia chkAutoDeleteOnStartup", chkAutoDeleteOnStartup->Checked);// zapisywanie wartoœci true/false do sekcji [Section1].
+	//zapisanie wybranej opcji B/KB/MB/GB cbbChosenDirSize
+	Ini->WriteInteger("Section1", "Zawartosc cbbChosenDirSize", cbbChosenDirSize->ItemIndex); // zapisywanie int do sekcji [Section1].)
+}
+//---------------------------------------------------------------------------
+/*
+ * loadConfigFromIni - Funkcja odczytuje aktualne ustawienia usuwania plików z ini
+ */
+void TMainWindow::loadConfigFromIni(){
+	boost::scoped_ptr<TIniFile> Ini;
+
+	//przy pierwszym uruchomieniu autowczytywanie z autoConfig.ini
+	if (startFlag == false) {
+		//wybieranie pliku ini automatycznie
+		Ini.reset(new TIniFile(ExtractFilePath(Application->ExeName) + "autoConfig.ini"));
+		startFlag = true;
+	}
+	else {
+		//otwarcie okna do wyboru pliku z którego chcemy za³adowaæ konfiguracje
+		boost::scoped_ptr<TOpenDialog> dlg(new TOpenDialog(this));
+		dlg->Title= "Choose a configuration file to load";	//tytu³
+		dlg->Filter = "Ini files (*.ini)|*.INI";	//wybranie rozszerzeñ plików jakie mog¹ zostaæ zapisane
+
+		if (dlg->Execute() == false) {
+			return;
+		}
+
+		//utworzenie pliku Ini
+		Ini.reset(new TIniFile(dlg->FileName));
+	}
+
+	//ustawienie koloru i napisu kontrolki edtProgramState
+	programState(" BUSY",clRed);
+
+	//wyczyszczenie wektorów danych i cbb jeœli za³adowano config
+	vecOfPaths.clear();
+	vecOfDirSizes.clear();
+	vecOfFilesMaps.clear();
+	vecOfFoldersMaps.clear();
+	vecOfExtensions.clear();
+	cbbSelectedPathsToDelete->Items->Clear();
+	cbbSizeOfDir->Items->Clear();
+	edtChosenDirSize->Clear();
+
+	//odczytanie licznika œcie¿ek edtPathsCounter
+	edtPathsCounter->Text = Ini->ReadString("Section1", "Zawartosc edtPathsCounter", 0); // odczytywanie tekstu z sekcji [Section1].
+
+	if (edtPathsCounter->Text.ToInt()) {
+		//wyczyszczenie pola tekstowego cbbSelectedPathsToDelete
+		cbbSelectedPathsToDelete->Text = "";
+		AnsiString currentPath;
+		int iteratorOfPaths = 0;
+		int counterOfPaths = edtPathsCounter->Text.ToInt();
+		for (int i = 0; i < counterOfPaths; i++) {
+			currentPath = Ini->ReadString("Section1", "Zawartosc wektora sciezek " + StrToInt(i), "");
+			//sprawdzanie, czy œcie¿ka dodawana z pliku ini istnieje
+			if (FileFunctions::dirExists(currentPath)) {
+				//dodanie œcie¿ek do wektora vecOfPaths
+				vecOfPaths.push_back(currentPath);
+				//dodanie œcie¿ek do cbbSelectedPathsToDelete
+				cbbSelectedPathsToDelete->Items->Add(vecOfPaths[i]);
+			}else{
+				//jeœli œcie¿ka z configa ju¿ nie istnieje
+				iteratorOfPaths++;
+				edtPathsCounter->Clear();
+				edtPathsCounter->Text = counterOfPaths - iteratorOfPaths;
+			}
+		}
+		//wype³nienie wektora vecOfDirSizes i cbbSizeOfDir
+		for (UINT i = 0; i < static_cast<UINT>(edtPathsCounter->Text.ToInt()); i++) {
+			//utworzenie pustych obiektów SortMap aby wpisaæ do nich póŸniej mapy
+			vecOfFilesMaps.push_back(SortMap());
+			vecOfFoldersMaps.push_back(SortMap());
+
+            //dodanie elementów do map plików i folderów
+			fillMaps(vecOfPaths[i], i);
+
+			//dodanie rozmiarów dir do wektora vecOfDirSizes
+			vecOfDirSizes.push_back(vecOfFilesMaps[i].getDirSize());
+
+			//dodanie rozmiarów dir do cbbSizeOfDir
+			cbbSizeOfDir->Items->Add(vecOfDirSizes[i]);
+		}
+	}
+
+	//odczytywanie ustawieñ maxDirSize
+	chkMaxDirSize->Checked = Ini->ReadBool("Section1", "Ustawienia chkMaxDirSize", 0);// odczytywanie wartoœci true/false z sekcji [SEKCJA1].
+	edtMaxDirSize->Text = Ini->ReadString("Section1", "Zawartosc edtMaxDirSize", ""); // odczytywanie tekstu z sekcji [Section1].
+	cbbMaxDirSize->ItemIndex = Ini->ReadInteger("Section1", "Zawartosc cbbMaxDirSize", 3); //odczytywanie tekstu z sekcji [Section1].
+
+	//odczytywanie ustawieñ wieku pliku
+	chkMaxAge->Checked = Ini->ReadBool("Section1", "Ustawienia chkMaxAge", 0);// odczytywanie wartoœci true/false z sekcji [SEKCJA1].
+	edtAge->Text = Ini->ReadString("Section1", "Zawartosc edtAge", ""); // odczytywanie tekstu z sekcji [Section1].
+	cbbAge->ItemIndex = Ini->ReadInteger("Section1", "Zawartosc cbbAge", 4); // odczytywanie tekstu z sekcji [Section1].
+	//odczytywanie ustawieñ rozmiaru pliku
+	chkMaxSize->Checked = Ini->ReadBool("Section1", "Ustawienia chkMaxSize", 0);// odczytywanie wartoœci true/false z sekcji [SEKCJA1].
+	edtSize->Text = Ini->ReadString("Section1", "Zawartosc edtSize", ""); // odczytywanie tekstu z sekcji [Section1].
+	cbbSize->ItemIndex = Ini->ReadInteger("Section1", "Zawartosc cbbSize", 3); //odczytywanie tekstu z sekcji [Section1].
+	//odczytywanie ustawieñ automatycznego powtarzania usuwania
+	chkRepeat->Checked = Ini->ReadBool("Section1", "Ustawienia chkRepeat", 0);// odczytywanie wartoœci true/false z sekcji [SEKCJA1].
+	edtRepeatTime->Text = Ini->ReadString("Section1", "Zawartosc edtRepeatTime", 1); // odczytywanie tekstu z sekcji [Section1].
+	cbbRepeatTime->ItemIndex = Ini->ReadInteger("Section1", "Ustawienia cbbRepeatTime", 3);// odczytywanie tekstu z sekcji [Section1].
+	//odczytywanie checkBoxów usuwania folderów
+	chkDeleteEmptiedCatalogs->Checked = Ini->ReadBool("Section1", "Ustawienia chkDeleteEmptiedCatalogs", 0);// odczytywanie wartoœci true/false z sekcji [SEKCJA1].
+	chkDeleteAllEmpty->Checked = Ini->ReadBool("Section1", "Ustawienia chkDeleteAllEmpty", 0);// odczytywanie wartoœci true/false z sekcji [SEKCJA1].
+	//odczytywanie usatwieñ kategorii plików (rozszerzeñ) do usuniêcia
+	chkAllFilesDelete->Checked = Ini->ReadBool("Section1", "Ustawienia chkAllFilesDelete", 0);// odczytywanie wartoœci true/false z sekcji [SEKCJA1].
+	chkImageDelete->Checked = Ini->ReadBool("Section1", "Ustawienia chkImageDelete", 0);// odczytywanie wartoœci true/false z sekcji [SEKCJA1].
+	chkTxtDelete->Checked = Ini->ReadBool("Section1", "Ustawienia chkTxtDelete", 0);// odczytywanie wartoœci true/false z sekcji [SEKCJA1].
+	chkLogDelete->Checked = Ini->ReadBool("Section1", "Ustawienia chkLogDelete", 0);// odczytywanie wartoœci true/false z sekcji [SEKCJA1].
+	chkOwnFileExtension->Checked = Ini->ReadBool("Section1", "Ustawienia chkOwnFileExtension", 0);// odczytywanie wartoœci true/false z sekcji [SEKCJA1].
+	edtFileExtension->Text = Ini->ReadString("Section1", "Zawartosc edtFileExtension",""); // odczytywanie tekstu z sekcji [Section1].
+	//odczytywanie autoDelete na starcie
+	chkAutoDeleteOnStartup->Checked = Ini->ReadBool("Section1", "Ustawienia chkAutoDeleteOnStartup", 0);// odczytywanie wartoœci true/false z sekcji [SEKCJA1].
+	//odczytanie wybranej opcji B/KB/MB/GB cbbChosenDirSize
+	cbbChosenDirSize->ItemIndex = Ini->ReadInteger("Section1", "Zawartosc cbbChosenDirSize", 2); // odczytywanie int do sekcji [Section1].)
+
+	//ustawienie flagi wczytania ustawieñ z pliku ini
+	loadCfgFlag = true;
+
+	//odœwie¿a komponenty cbb, edt, chk itd.
+	refreshComponents();
+
+	//odœwie¿enie listy plików
+	refreshListOfFiles();
+
+	//jeœli jest zaznaczona opcja chkAutoDeleteOnStartup to wykonuj od razu
+	//AutoDelete z wyznaczonych œcie¿ek
+	if (chkAutoDeleteOnStartup->Checked) {
+		btnAutoDeleteClick(NULL);
+	}
+
+	//ustawienie koloru i napisu kontrolki edtProgramState
+	programState(" FREE", clGreen);
+}
+//---------------------------------------------------------------------------
+/*
+ * btnLoadConfigClick - Funkcja wywo³uje odczytanie ustawieñ z pliku ini
+ */
+void __fastcall TMainWindow::btnLoadConfigClick(TObject *Sender){
+	loadConfigFromIni();
+}
+//---------------------------------------------------------------------------
+/*
+ * FormCreate - Tworzy okno programu i obiekt TTrayIcon
+ */
+void __fastcall TMainWindow::FormCreate(TObject *Sender){
+	trayIcon= new TTrayIcon(this);
+	trayIcon->OnClick = trayIconClick;
+
+	//ukrywa ikonê po w³¹czeniu programu
+	trayIcon->Visible = true;
+	Hide();
+	this->WindowState = wsMinimized;
+    //ukrywa ikonê po klikniêciu minimalizacji
+	Application->OnMinimize = OnAppMinimize;
+}
+//---------------------------------------------------------------------------
+/*
+ * OnAppMinimize - po klikniêciu minimalizacji ukrywa program w tray'u
+ */
+void __fastcall TMainWindow::OnAppMinimize(TObject *Sender){
+	trayIcon->Visible = true;
+	Hide();
+	this->WindowState = wsMinimized;
+}
+//---------------------------------------------------------------------------
+/*
+ * trayIconClick - przywraca okno po klikniêciu ikony w tray'u
+ */
+void __fastcall TMainWindow::trayIconClick(TObject *Sender){
+	Show();
+	this->WindowState = wsNormal;
+	Application->BringToFront();
+	trayIcon->Visible = false;
+}
+//---------------------------------------------------------------------------
+/**
+ * Destruktor
+ */
+__fastcall TMainWindow::~TMainWindow(){
+	delete trayIcon;
+	trayIcon = NULL;
+}
+//---------------------------------------------------------------------------
+/**
+ * chkOwnFileExtensionClick - Obs³uga klikniêcia kontrolki chkOwnFileExtension
+ */
+void __fastcall TMainWindow::chkOwnFileExtensionClick(TObject *Sender){
+	//odœwie¿a komponenty cbb, edt, chk itd.
+	refreshComponents();
+}
+//---------------------------------------------------------------------------
+/**
+ * fillVectorOfExtensions - Funkcja pobiera ze stringa pozbawionego spacji tekst
+ * pomiêdzy przecinkami i umieszcza go do wektora - rozszerzenia plików
+ * @param AnsiString tmp - ³añcuch string bez spacji
+ * @return vector<AnsiString> vecOfExtensions - wektor podanych przez usera rozszerzeñ
+ */
+void TMainWindow::fillVectorOfExtensions(const AnsiString &tmp){
+	vector<int>vecOfCommaPos;
+	vecOfCommaPos.clear();
+	vecOfExtensions.clear();
+
+	//znajduje wszystkie przecinki i dodaje ich numer wyst¹pienia w stringu do wektora
+	for(char * posOfSign = strchr(tmp.c_str(), ',' ); posOfSign != NULL; posOfSign = strchr( posOfSign + 1, ',' )){
+		vecOfCommaPos.push_back(posOfSign - tmp.c_str());
+	}
+	//wpisanie rozszerzeñ bez spacji
+	edtFileExtension->Text = tmp;
+
+	//wype³nienie wektora vecOfExtensions rozszerzeniami plików
+	if (tmp.Length()>1) {
+		//jeœli podano tylko 1 rozszerzenie
+		if (vecOfCommaPos.size() == 0) {
+			vecOfExtensions.push_back(tmp);
+			return;
+		}
+		
+		//dla pierwszego rozszerzenia
+		vecOfExtensions.push_back(tmp.SubString(0,vecOfCommaPos[0]));
+
+		AnsiString currentExtension;
+		//dla wszystkich kolejnych rozszerzeñ miedzy przecinkami
+		for (UINT i = 0; i < vecOfCommaPos.size()-1; i++) {
+			currentExtension = tmp.SubString(vecOfCommaPos[i]+2,vecOfCommaPos[i+1] - vecOfCommaPos[i] - 1);
+			if (currentExtension.Length() > 0) {
+				vecOfExtensions.push_back(currentExtension);
+			}
+		}
+		//dla ostatniego rozszerzenia po przecinku
+		currentExtension = tmp.SubString(vecOfCommaPos.back()+2,tmp.Length() - vecOfCommaPos.back() - 1);
+		if (currentExtension.Length() > 0) {
+			vecOfExtensions.push_back(currentExtension);
+		}
+	}
+}
+//---------------------------------------------------------------------------
+/**
+ * chkMaxDirSizeClick - Obs³uga klikniêcia kontrolki chkMaxDirSize
+ */
+void __fastcall TMainWindow::chkMaxDirSizeClick(TObject *Sender){
+	//odœwie¿a komponenty cbb, edt, chk itd.
+	refreshComponents();
+}
+//---------------------------------------------------------------------------
+/**
+ * programState - Funkcja programState ustawia kolor i napis kontrolki edtProgramState
+ */
+void TMainWindow::programState(const String &progState, System::Uitypes::TColor color){
+	edtProgramState->Text = progState;
+	edtProgramState->Color = color;
+}
+//---------------------------------------------------------------------------
+/**
+ * chkViewFilesClick - Obs³uga klikniêcia kontrolki chkViewFiles
+ */
+void __fastcall TMainWindow::chkViewFilesClick(TObject *Sender){
+	//ustawienie koloru i napisu kontrolki edtProgramState
+	programState(" BUSY", clRed);
+
+	if (chkViewFiles->Checked) {
+		refreshListOfFiles();
+	}else{
+		//czyszzcenie listView
+		lvFileListView->Clear();
+	}
+
+	//ustawienie koloru i napisu kontrolki edtProgramState
+	programState(" FREE", clGreen);
+}
+//---------------------------------------------------------------------------
+/**
+ * refreshListOfFiles - odœwie¿a listê ListWiew
+ */
+void TMainWindow::refreshListOfFiles(){
+    //ustawienie koloru i napisu kontrolki edtProgramState
+	programState(" BUSY", clRed);
+
+	if (chkViewFiles->Checked){
+		//czyszczenie listView
+		lvFileListView->Clear();
+		for (UINT i = 0; i < vecOfPaths.size(); i++) {
+			//wywo³anie funkcji która wype³nia ListView plikami z wybranego katalogu
+			listCatalogs(vecOfPaths[i], i);
+		}
+	}
+
+	//ustawienie koloru i napisu kontrolki edtProgramState
+	programState(" FREE", clGreen);
+}
+//---------------------------------------------------------------------------
+/**
+ * chkAllFilesDeleteClick - Obs³uga klikniêcia kontrolki chkAllFilesDelete
+ */
+void __fastcall TMainWindow::chkAllFilesDeleteClick(TObject *Sender){
+	//odœwie¿a komponenty cbb, edt, chk itd.
+	refreshComponents();
+}
+//---------------------------------------------------------------------------
+/**
+ * btnExtensionApplyClick - przycisk do potwierdzenia dodanych rozszerzeñ do usuniêcia
+ * dodaje je rónie¿ do wektora vecOfExtensions
+ */
+void TMainWindow::extensionApply(bool flag){
+	//jeœli wciœniêto przycisk
+	if (flag) {
+		//odczytanie nazw rozszerzeñ z form1
+		UnicodeString userFileExtensions = edtFileExtension->Text;
+
+		//funkcja usuwa spacje ze stringa
+		UnicodeString tmp = FileFunctions::removeSpaces(userFileExtensions);
+
+		//funkcja zwraca wektor rozszerzeñ plików do usuniêcia
+		fillVectorOfExtensions(tmp);
+		//wy³¹cza mo¿liwoœæ zmiany rozszerzeñ
+		edtFileExtension->Enabled = false;
+	}else{
+		//w³¹cza mo¿liwoœæ zmiany rozszerzeñ
+		edtFileExtension->Enabled = true;
+		//wyczyszczenie wektora rozszerzeñ
+		vecOfExtensions.clear();
+	}
+}
+//---------------------------------------------------------------------------
+/**
+ * btnAddPathClick - dodaje wybran¹ œcie¿kê do cbbSelectedPathsToDelete, cbbSizeOfDir i vecOfPaths, vecOfDirSizes
+ */
+void __fastcall TMainWindow::btnAddPathClick(TObject *Sender){
+	//œcie¿ka pocz¹tkowa
+	String strDirectory = ExtractFilePath(Application->ExeName);
+	//umieszcza œcie¿kê wybran¹ przez u¿ytkowanika w strDirectory
+	int SelectionOK = SelectDirectory(strDirectory, TSelectDirOpts(), 0);
+
+	if (SelectionOK) {
+		//jeœli trafi³ siê jakikolwiek wyj¹tek to wyœwietla komunikat i nie pozwala usuwaæ
+		if (deleteExceptions(strDirectory)){
+			return;
+		}
+
+		//ustawienie koloru i napisu kontrolki edtProgramState
+		programState(" BUSY", clRed);
+
+		//jeœli to 1 dodawany element do cbb
+		if (cbbSelectedPathsToDelete->Items->Count == 0) {
+			//dodanie wybranej œcie¿ki do cbbSelectedPathsToDelete
+			cbbSelectedPathsToDelete->Items->Add(strDirectory + "\\");
+		}else{
+			bool pathExistFlag = false;
+			//sprawdzenie, czy dana œcie¿ka ju¿ istnieje w cbbSelectedPathsToDelete
+			for (int i = 0; i < cbbSelectedPathsToDelete->Items->Count; i++) {
+				cbbSelectedPathsToDelete->ItemIndex = i;
+				if (cbbSelectedPathsToDelete->Text == strDirectory + "\\") {
+					//ustawienie flagi, jeœli œcie¿ka istnieje
+					pathExistFlag = true;
+				}
+			}
+			//jeœli œcie¿ka ju¿ by³a w comboBox to komunikat jeœli nie to dodajemy
+			if (pathExistFlag) {
+				ShowMessage("This path is already added! Choose another.");
+			}else{
+				//dodanie wybranej œcie¿ki do cbbSelectedPathsToDelete
+				cbbSelectedPathsToDelete->Items->Add(strDirectory + "\\");
+			}
+		}
+
+		//wype³nia wektor vecOfPaths œcie¿kami wybranymi przez usera
+		fillVectorOfPaths();
+
+		//wpisanie aktualnej œcie¿ki do zmiennej
+		String currentPath = strDirectory + "\\";
+		UINT bufor = vecOfPaths.size() - 1;
+
+		//jeœli zaznaczono opcjê chkViewFiles to listuj pliki
+		if(chkViewFiles->Checked) listCatalogs(currentPath, bufor);
+
+		//utworzenie pustych obiektów SortMap aby wpisaæ do nich póŸniej mapy
+		vecOfFilesMaps.push_back(SortMap());
+		vecOfFoldersMaps.push_back(SortMap());
+
+		//dodanie elementów do map plików i folderów
+		fillMaps(currentPath, bufor);
+
+		//dodanie aktualnej wielkoœci do wektora vecOfDirSizes
+		vecOfDirSizes.push_back(vecOfFilesMaps[bufor].getDirSize());
+
+		//wype³nienie cbbSizeOfDir wielkoœciami dir
+		fillCbbSizeOfDir();
+
+		//odœwie¿a komponenty w oknie programu
+		refreshComponents();
+
+		//uzupe³nienie edtChosenDirSize wielkoœci¹ aktualnie zaznaczonej œcie¿ki
+		cbbSelectedPathsToDeleteChange(NULL);
+
+		//ustawienie koloru i napisu kontrolki edtProgramState
+		programState(" FREE", clGreen);
+	}
+}
+//---------------------------------------------------------------------------
+/**
+ * fillCbbSizeOfDir - Funkcja wype³nia cbbSizeOfDir wielkoœciami dir
+ */
+void TMainWindow::fillCbbSizeOfDir(){
+	//wyczyszczenie cbbSizeOfDir
+	cbbSizeOfDir->Items->Clear();
+
+	//dodanie do cbbSizeOfDir elementow zawartych w wektorze vecOfDirSizes
+	for (UINT i = 0; i < vecOfDirSizes.size(); i++) {
+		cbbSizeOfDir->Items->Add(vecOfDirSizes[i]);
+	}
+}
+//---------------------------------------------------------------------------
+/**
+ * fillVectorOfPaths - Funkcja wype³nia wektor vecOfPaths œcie¿kami wybranymi przez usera
+ */
+void TMainWindow::fillVectorOfPaths(){
+	//wyczyszczenie wektora œcie¿ek
+	vecOfPaths.clear();
+
+	//wype³nienie wektora kolejnymi wybranymi przez usera scie¿kami z cbbSelectedPathsToDelete
+	for (int i = 0; i < cbbSelectedPathsToDelete->Items->Count; i++) {
+		cbbSelectedPathsToDelete->ItemIndex = i;
+		//dodanie danej œcie¿ki do wektora
+		String currentPath = cbbSelectedPathsToDelete->Text;
+		vecOfPaths.push_back(currentPath);
+	}
+	//wyœwietla liczbê wybranych œcie¿ek w edtPathsCounter
+	edtPathsCounter->Text = IntToStr(cbbSelectedPathsToDelete->Items->Count);
+}
+//---------------------------------------------------------------------------
+/**
+ * btnDeletePathClick - usuwa wybran¹ œcie¿kê z cbbSelectedPathsToDelete, cbbSizeOfDir i vecOfPaths, vecOfDirSizes
+ */
+void __fastcall TMainWindow::btnDeletePathClick(TObject *Sender){
+	//zabezpieczenie przed usuwaniem elementów, gdy ¿aden nie jest zaznaczony
+	if (cbbSelectedPathsToDelete->Text == "") {
+		ShowMessage("No selection.");
+		return;
+	}
+	int selectedItemIndex = cbbSelectedPathsToDelete->ItemIndex;
+	//usuwa wybran¹ œcie¿kê z cbbSelectedPathsToDelete
+	cbbSelectedPathsToDelete->Items->Delete(selectedItemIndex);
+
+	//wype³nia od nowa wektor vecOfPaths œcie¿kami wybranymi przez usera
+	fillVectorOfPaths();
+
+	//usuwanie wartoœci size z cbb i wektora
+	vecOfDirSizes.erase(vecOfDirSizes.begin() + selectedItemIndex);
+
+	//wype³nienie cbbSizeOfDir wielkoœciami dir
+	fillCbbSizeOfDir();
+
+	//wyczyszczenie edtChosenDirSize
+	edtChosenDirSize->Clear();
+
+	//uzupe³nienie edtChosenDirSize wielkoœci¹ aktualnie zaznaczonej œcie¿ki
+	cbbSelectedPathsToDeleteChange(NULL);
+
+	//odœwie¿ listê plików ListView
+	refreshListOfFiles();
+
+	//wyczyszczenie wektora wielkoœci dirów
+	if (vecOfDirSizes.size() == 0) {
+		cbbSelectedPathsToDelete->Clear();
+	}
+
+    //jeœli nie ma ju¿ œcie¿ek w cbbSelectedPathsToDelete to wyswietl tekst
+	if (cbbSelectedPathsToDelete->Items->Count == 0) {
+		cbbSelectedPathsToDelete->Text = "No selection.";
+	}
+
+	//usuwanie elementów wektorów map
+	vecOfFilesMaps.erase(vecOfFilesMaps.begin() + selectedItemIndex);
+	vecOfFoldersMaps.erase(vecOfFoldersMaps.begin() + selectedItemIndex);
+}
+//---------------------------------------------------------------------------
+/**
+ * chkAutoDeleteOnStartupClick - Obs³uga klikniêcia kontrolki chkAutoDeleteOnStartup
+ */
+void __fastcall TMainWindow::chkAutoDeleteOnStartupClick(TObject *Sender){
+	//odœwie¿a komponenty w oknie programu
+	refreshComponents();
+}
+//---------------------------------------------------------------------------
+/**
+ * cbbSelectedPathsToDeleteChange - ustawia edtChosenDirSize na wielkoœæ wybranego dir
+ */
+void __fastcall TMainWindow::cbbSelectedPathsToDeleteChange(TObject *Sender){
+	int selectedItemIndex = cbbSelectedPathsToDelete->ItemIndex;
+	//pobiera wielkoœæ dir z wektora i przemna¿a j¹ przez wybran¹ opcjê
+	if (selectedItemIndex != -1) {
+		double sizeToShow = vecOfDirSizes[selectedItemIndex].ToDouble() / getChosenDirSizeOption();
+
+		String convert;
+		//konwersja zeby wyœwietlaæ liczbe z 2 miejscami po przecinku
+		convert.sprintf(L"%.2f", sizeToShow);
+		//wyœwietlenie liczby w edtChosenDirSize
+		edtChosenDirSize->Text = convert;
+	}
+}
+//---------------------------------------------------------------------------
+/**
+ * cbbChosenDirSizeChange - odœwie¿a edtChosenDirSize wg wybranej opcji B/KB/MB/GB
+ */
+void __fastcall TMainWindow::cbbChosenDirSizeChange(TObject *Sender){
+	//zabezpieczenie przed zmian¹ comboboxa w trakcie dzia³ania programu
+	if (edtChosenDirSize->Text == "") {
+		return;
+	}
+	cbbSelectedPathsToDeleteChange(NULL);
+}
+//---------------------------------------------------------------------------
+

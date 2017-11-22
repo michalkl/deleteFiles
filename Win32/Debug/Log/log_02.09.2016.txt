@@ -1,0 +1,6 @@
+14:19:17 - C:\AIC\ProjektyBuilder\doTestowDeleteFiles\doTestow\Opener 2016\Sigur Ros\Takk\Me? Bló?nasir.mp3 - NIE UDALO SIE USUNAC PLIKU - SPRAWDZ DLACZEGO!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+14:36:01 - C:\AIC\ProjektyBuilder\doTestowDeleteFiles\doTestow\Opener 2016\Sigur Ros\Von\Leit A? Lífi.mp3 - NIE UDALO SIE USUNAC PLIKU - SPRAWDZ DLACZEGO!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+14:36:31 - C:\AIC\ProjektyBuilder\doTestowDeleteFiles\doTestow\ - Usunieto 5 plikow. (Utrzymanie wielkosci dir, w sumie usunieto: 30791092 B)
+

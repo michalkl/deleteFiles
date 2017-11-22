@@ -1,0 +1,78 @@
+//---------------------------------------------------------------------------
+
+#ifndef Unit1H
+#define Unit1H
+//---------------------------------------------------------------------------
+#include <System.Classes.hpp>
+#include <Vcl.Controls.hpp>
+#include <Vcl.StdCtrls.hpp>
+#include <Vcl.Forms.hpp>
+#include <Vcl.Dialogs.hpp>
+#include <Vcl.Grids.hpp>
+#include <Vcl.ValEdit.hpp>
+#include <Vcl.ComCtrls.hpp>
+#include <Vcl.ExtCtrls.hpp>
+//---------------------------------------------------------------------------
+class TForm1 : public TForm
+{
+__published:	// IDE-managed Components
+	TButton *btnSelect;
+	TLabel *lbl1;
+	TEdit *edtChosenFilePath;
+	TLabel *lbl2;
+	TEdit *edtCurrentTime;
+	TLabel *lbl5;
+	TListView *lvFileListView;
+	TEdit *edtAge;
+	TEdit *edtSize;
+	TLabel *lbl3;
+	TButton *btnAutoDelete;
+	TCheckBox *chkMaxAge;
+	TCheckBox *chkMaxSize;
+	TCheckBox *chkDeleteEmptiedCatalogs;
+	TCheckBox *chkDeleteAllEmpty;
+	TComboBox *cbbAge;
+	TComboBox *cbbSize;
+	TEdit *edtRepeatTime;
+	TComboBox *cbbRepeatTime;
+	TTimer *tmrAutoDelete;
+	TCheckBox *chkRepead;
+	TTimer *tmrAutoRefresh;
+	void __fastcall btnSelectClick(TObject *Sender);
+	void __fastcall btnAutoDeleteClick(TObject *Sender);
+	void __fastcall chkMaxAgeClick(TObject *Sender);
+	void __fastcall chkMaxSizeClick(TObject *Sender);
+	void __fastcall tmrAutoDeleteTimer(TObject *Sender);
+	void __fastcall chkRepeadClick(TObject *Sender);
+	void __fastcall FormResize(TObject *Sender);
+	void __fastcall tmrAutoRefreshTimer(TObject *Sender);
+
+private:	// User declarations
+	void listCatalogs(const String &path);
+	size_t getFileSize(const char* filename);
+	String getFileDate(const char* filename);
+	String getCurrentDate();
+	void deleteFiles(const String &path);
+	//void deleteCatalogs(String path);
+	double getDiffIntDate(const char* filename);
+	void fillListView(const String &path, const TSearchRec &sr);
+	bool deleteCheck(const char * fileNameChar);
+	double getAgeOption();
+	double getSizeOption();
+	double getRepeadTime();
+	double getUserSize();
+	double getUserAge();
+	double getUserRepeatTime();
+	String returnPath();
+	void createListView();
+	bool buttonChangeFlag;
+	double userSize;
+	double userAge;
+
+public:		// User declarations
+	__fastcall TForm1(TComponent* Owner);
+};
+//---------------------------------------------------------------------------
+extern PACKAGE TForm1 *Form1;
+//---------------------------------------------------------------------------
+#endif

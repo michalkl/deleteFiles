@@ -1,0 +1,43 @@
+//---------------------------------------------------------------------------
+
+#pragma hdrstop
+
+#include "SortMap.h"
+#include "main.h"
+//---------------------------------------------------------------------------
+#pragma package(smart_init)
+
+//---------------------------------------------------------------------------
+/**
+ * addElementToListView - Funkcja wype³niaj¹ca ListView plikami znajduj¹cymi siê w katalogu
+					wybranym przez u¿ytkownika
+ * @param String path - œcie¿ka do folderu podanego przez u¿ytkownika
+ */
+void SortMap::addElementToMap(const String &path, const TSearchRec &sr){
+//	TForm1 main;
+//
+//	//potrzebne do wyœwietlania ListView
+//	TListItem *ListIt =  NULL;
+//
+//	//filname sk³ada siê z aktualnej œcie¿ki oraz aktualnego pliku
+//	AnsiString fileName = path + sr.Name;
+//	int size = sizeof(sr);
+//	int size2 = sizeof(&sr);
+//	//konwersja String na const char * dla funkcji getFilesize i getFileDate itp.
+//	const char * fileNameChar = fileName.c_str();
+//	//usuwa okreœlon¹ liczbê liter ze stringa (ca³¹ œcie¿kê, oprócz nazwy pliku)
+//	AnsiString fileNameDeleted = fileName;
+//	fileNameDeleted = fileNameDeleted.Delete(1, main.edtChosenFilePath->Text.Length() + 1);
+//
+//	ListIt = lvFileListView->Items->Add();
+//	//dodaje nazwê pliku do ListView
+//	ListIt->Caption = fileNameDeleted;
+//	//wpisuje do ListView rozmiar danego pliku
+//	ListIt->SubItems->Add(main.getFileSize(fileNameChar));
+//	//wpisuje do ListView date danego pliku
+//	ListIt->SubItems->Add(main.getFileDate(fileNameChar));
+//	//zwraca ró¿nicê pomiêdzy aktualn¹ dat¹, a dat¹ pliku w postaci dni
+//	double diff2Days = main.getDiffIntDate(fileNameChar);
+//	diff2Days = ceil(diff2Days/86400);
+//	ListIt->SubItems->Add(diff2Days);
+}//---------------------------------------------------------------------------

@@ -1,0 +1,12 @@
+//---------------------------------------------------------------------------
+
+#ifndef FileFunctionsH
+#define FileFunctionsH
+//class String;
+//---------------------------------------------------------------------------
+class FileFunctions {
+public:
+	/**/
+	static String getFileDate(const char* filename);
+};
+#endif

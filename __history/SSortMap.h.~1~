@@ -1,0 +1,32 @@
+//---------------------------------------------------------------------------
+
+#ifndef SortMapH
+#define SortMapH
+//---------------------------------------------------------------------------
+#include <System.Classes.hpp>
+#include <Vcl.Controls.hpp>
+#include <Vcl.StdCtrls.hpp>
+#include <Vcl.Forms.hpp>
+#include <Vcl.Dialogs.hpp>
+#include <Vcl.Grids.hpp>
+#include <Vcl.ValEdit.hpp>
+#include <Vcl.ComCtrls.hpp>
+#include <Vcl.ExtCtrls.hpp>
+
+//---------------------------------------------------------------------------
+struct fileInfo {
+	String pathOfFile;
+	int size;
+	long int ageInSec;
+};
+//---------------------------------------------------------------------------
+class SortMap{
+
+public:	// User declarations
+void addElementToMap(const String &path, const TSearchRec &sr);
+
+private:		// User declarations
+
+};
+//---------------------------------------------------------------------------
+#endif

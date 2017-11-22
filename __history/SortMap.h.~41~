@@ -1,0 +1,35 @@
+//---------------------------------------------------------------------------
+
+#ifndef SortMapH
+#define SortMapH
+//---------------------------------------------------------------------------
+#include <System.Classes.hpp>
+#include<map>
+
+//---------------------------------------------------------------------------
+struct FileInfo{
+	String pathOfFile;
+	int size;
+	long int ageInSec;
+};
+//---------------------------------------------------------------------------
+class SortMap{
+
+public:	// User declarations
+	SortMap();
+
+	void addElementToMap(const String &path, const TSearchRec &sr);
+	void deleteFirstElementFromMap(std::multimap<long long int, FileInfo>::iterator iter);
+	void deleteElementFromMapByIndex(std::multimap<long long int, FileInfo>::iterator iter);
+	long long int getDirSize();
+	//long long sizeOfDirCounter;
+
+	//zmienne
+	//deklaracja mapy, long int to key, fileInfo to typ danych, sortowanie domyœlnie
+	std::multimap <long long int, FileInfo> filesMap;
+
+private:		// User declarations
+	long long int dirSize;
+};
+//---------------------------------------------------------------------------
+#endif
